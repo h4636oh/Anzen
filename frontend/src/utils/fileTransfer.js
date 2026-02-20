@@ -4,14 +4,14 @@ const CHUNK_SIZE = 16 * 1024 // 16 KB per chunk
 
 /**
  * Send a File over a RTCDataChannel with chunking.
- * @param {RTCDataChannel} channel
- * @param {File} file
+ * senderMeta: { senderId, senderName, avatarSeed } — included in file-meta so the
+ * receiver can display the correct username and avatar instead of "Peer".
  */
-export async function sendFile(channel, file) {
+export async function sendFile(channel, file, senderMeta = {}) {
     const buffer = await file.arrayBuffer()
     const totalChunks = Math.ceil(buffer.byteLength / CHUNK_SIZE)
 
-    // Send metadata first
+    // Send metadata first (includes sender identity for the receiver's display)
     channel.send(JSON.stringify({
         type: 'file-meta',
         name: file.name,
@@ -19,14 +19,16 @@ export async function sendFile(channel, file) {
         size: file.size,
         totalChunks,
         transferId: crypto.randomUUID(),
+        senderId: senderMeta.senderId || '',
+        senderName: senderMeta.senderName || 'Peer',
+        avatarSeed: senderMeta.avatarSeed || '',
     }))
 
     // Send binary chunks
     for (let i = 0; i < totalChunks; i++) {
         const start = i * CHUNK_SIZE
         const end = Math.min(start + CHUNK_SIZE, buffer.byteLength)
-        const chunk = buffer.slice(start, end)
-        channel.send(chunk)
+        channel.send(buffer.slice(start, end))
     }
 
     // Send end marker
@@ -35,9 +37,6 @@ export async function sendFile(channel, file) {
 
 /**
  * Reconstruct a Blob from accumulated ArrayBuffer chunks.
- * @param {ArrayBuffer[]} chunks
- * @param {object} meta - { name, mimeType, size }
- * @returns {{ blob: Blob, objectUrl: string }}
  */
 export function reassembleFile(chunks, meta) {
     const blob = new Blob(chunks, { type: meta.mimeType || 'application/octet-stream' })

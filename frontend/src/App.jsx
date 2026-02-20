@@ -265,8 +265,28 @@ export default function App() {
   }
 
   async function handleSendFile(file) {
+    if (!user || !activeRoom) return
     broadcastFile(file)
+
+    // Create a local display message for the sender (mirrors what the receiver gets)
+    const blob = file
+    const objectUrl = URL.createObjectURL(file)
+    const msg = {
+      id: crypto.randomUUID(),
+      type: file.type.startsWith('image/') || file.type.startsWith('video/') ? 'media' : 'file',
+      senderId: user.peerId,
+      senderName: user.username,
+      avatarSeed: user.avatarSeed,
+      timestamp: Date.now(),
+      fileName: file.name,
+      mimeType: file.type,
+      objectUrl,
+      blob,
+    }
+    setMessages(prev => [...prev, msg])
+    await addMessage(activeRoom, msg)
   }
+
 
   // ── Wipe ──────────────────────────────────────────────────────────────────────
   async function handleClearChat() {

@@ -11,7 +11,8 @@ export async function getPrefs() {
     const username = await prefsStore.getItem('username')
     const avatarSeed = await prefsStore.getItem('avatarSeed')
     const theme = await prefsStore.getItem('theme')
-    return { username, avatarSeed, theme }
+    const peerId = await prefsStore.getItem('peerId')   // ← was missing, caused new UUID on every reload
+    return { username, avatarSeed, theme, peerId }
 }
 
 export async function savePrefs(prefs) {
@@ -39,12 +40,25 @@ export async function deleteRoom(roomName) {
 
 // ── Messages ──────────────────────────────────────────────────────────────────
 export async function getMessages(roomName) {
-    return (await messagesStore.getItem(roomName)) || []
+    const msgs = (await messagesStore.getItem(roomName)) || []
+    // Recreate objectUrls from stored blobs (blob: URLs are session-scoped and die on reload)
+    return msgs.map(msg => {
+        if (msg.blob && (msg.type === 'media' || msg.type === 'file')) {
+            try {
+                return { ...msg, objectUrl: URL.createObjectURL(msg.blob) }
+            } catch {
+                return msg
+            }
+        }
+        return msg
+    })
 }
 
 export async function addMessage(roomName, message) {
     const existing = (await messagesStore.getItem(roomName)) || []
-    existing.push(message)
+    // Never store objectUrl — it's session-scoped. We store blob and recreate on load.
+    const { objectUrl: _drop, ...toStore } = message
+    existing.push(toStore)
     await messagesStore.setItem(roomName, existing)
 }
 

@@ -62,11 +62,13 @@ export function useWebRTC({ signalingWsRef, localPeerId, localUser, onMessage, o
                     if (entry) {
                         const { blob, objectUrl } = reassembleFile(entry.chunks, entry.meta)
                         inboundFiles.current.delete(peerId)
+                        // Use identity from file-meta (includes senderName & avatarSeed)
                         onMessageRef.current({
                             id: crypto.randomUUID(),
                             type: isMedia(entry.meta.mimeType) ? 'media' : 'file',
-                            senderId: peerId,
-                            senderName: msg.senderName || 'Peer',
+                            senderId: entry.meta.senderId || peerId,
+                            senderName: entry.meta.senderName || 'Peer',
+                            avatarSeed: entry.meta.avatarSeed || peerId,
                             timestamp: Date.now(),
                             fileName: entry.meta.name,
                             mimeType: entry.meta.mimeType,
@@ -197,8 +199,13 @@ export function useWebRTC({ signalingWsRef, localPeerId, localUser, onMessage, o
 
     // ── Send a file to all open data channels ─────────────────────────────────────
     const broadcastFile = useCallback((file) => {
+        const senderMeta = {
+            senderId: localPeerIdRef.current,
+            senderName: localUserRef.current?.username,
+            avatarSeed: localUserRef.current?.avatarSeed,
+        }
         for (const [, channel] of dataChannels.current) {
-            if (channel.readyState === 'open') sendFile(channel, file)
+            if (channel.readyState === 'open') sendFile(channel, file, senderMeta)
         }
     }, [])
 
