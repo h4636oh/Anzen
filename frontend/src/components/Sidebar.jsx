@@ -1,0 +1,180 @@
+// Sidebar.jsx — Left navigation: rooms list + user profile (with drag-to-resize)
+import { useState, useRef, useCallback } from 'react'
+import { Plus, Hash, Shield, LogOut, Trash2, Sun, Moon } from 'lucide-react'
+import { generateRoomName } from '../utils/generators.js'
+import Avatar from './Avatar.jsx'
+
+const MIN_WIDTH = 200
+const MAX_WIDTH = 480
+
+export default function Sidebar({
+    user,
+    rooms,
+    activeRoom,
+    onSelectRoom,
+    onJoinRoom,
+    onLeaveRoom,
+    onGoToLanding,
+    theme,
+    onToggleTheme,
+    width,
+    onWidthChange,
+}) {
+    const [showJoinPanel, setShowJoinPanel] = useState(false)
+    const [roomInput, setRoomInput] = useState('')
+    const [passInput, setPassInput] = useState('')
+    const [isCreating, setIsCreating] = useState(false)
+    const dragging = useRef(false)
+
+    // ── Resize drag handle ────────────────────────────────────────────────────────
+    const onMouseDown = useCallback((e) => {
+        e.preventDefault()
+        dragging.current = true
+        document.body.style.cursor = 'col-resize'
+        document.body.style.userSelect = 'none'
+
+        const onMove = (ev) => {
+            if (!dragging.current) return
+            const newW = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, ev.clientX))
+            onWidthChange(newW)
+        }
+        const onUp = () => {
+            dragging.current = false
+            document.body.style.cursor = ''
+            document.body.style.userSelect = ''
+            window.removeEventListener('mousemove', onMove)
+            window.removeEventListener('mouseup', onUp)
+        }
+        window.addEventListener('mousemove', onMove)
+        window.addEventListener('mouseup', onUp)
+    }, [onWidthChange])
+
+    function handleGenerateRoom() {
+        setRoomInput(generateRoomName())
+    }
+
+    function handleSubmit(e) {
+        e.preventDefault()
+        if (!roomInput.trim() || !passInput.trim()) return
+        onJoinRoom(roomInput.trim().toLowerCase(), passInput.trim(), isCreating)
+        setRoomInput('')
+        setPassInput('')
+        setShowJoinPanel(false)
+    }
+
+    return (
+        <aside
+            className="h-full flex flex-col border-r border-base relative flex-shrink-0"
+            style={{ background: 'var(--color-surface)', width, minWidth: MIN_WIDTH, maxWidth: MAX_WIDTH }}
+        >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3.5 border-b border-base">
+                <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                        style={{ background: 'var(--color-accent)' }}>
+                        <Shield size={16} color="white" strokeWidth={2.5} />
+                    </div>
+                    <span className="font-bold text-base" style={{ color: 'var(--color-text)' }}>Anzen</span>
+                </div>
+                <div className="flex items-center gap-1">
+                    <button onClick={onToggleTheme} className="btn-ghost p-2 rounded-md" title="Toggle theme">
+                        {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                    </button>
+                    <button onClick={() => setShowJoinPanel(v => !v)}
+                        className="btn-ghost p-2 rounded-md" title="Join or create room">
+                        <Plus size={16} style={{ color: showJoinPanel ? 'var(--color-accent)' : undefined }} />
+                    </button>
+                </div>
+            </div>
+
+            {/* Join / Create panel */}
+            {showJoinPanel && (
+                <form onSubmit={handleSubmit} className="px-3 py-3 border-b border-base flex flex-col gap-2">
+                    <div className="flex gap-1 surface-2 rounded-md p-0.5">
+                        <button type="button"
+                            onClick={() => setIsCreating(false)}
+                            className={`flex-1 text-sm py-1.5 rounded transition-all font-medium ${!isCreating ? 'btn-primary' : 'btn-ghost'}`}>
+                            Join
+                        </button>
+                        <button type="button"
+                            onClick={() => setIsCreating(true)}
+                            className={`flex-1 text-sm py-1.5 rounded transition-all font-medium ${isCreating ? 'btn-primary' : 'btn-ghost'}`}>
+                            Create
+                        </button>
+                    </div>
+                    <div className="flex gap-1.5">
+                        <input className="input-field flex-1 text-sm py-2"
+                            placeholder="room-name"
+                            value={roomInput}
+                            onChange={e => setRoomInput(e.target.value)} />
+                        {isCreating && (
+                            <button type="button" onClick={handleGenerateRoom}
+                                className="btn-ghost px-2.5 text-base border border-base rounded" title="Generate room name">
+                                ⚄
+                            </button>
+                        )}
+                    </div>
+                    <input className="input-field text-sm py-2"
+                        placeholder="password"
+                        type="password"
+                        value={passInput}
+                        onChange={e => setPassInput(e.target.value)} />
+                    <button type="submit" className="btn-primary text-sm py-2 rounded-md">
+                        {isCreating ? 'Create Room' : 'Join Room'}
+                    </button>
+                </form>
+            )}
+
+            {/* Rooms list */}
+            <div className="flex-1 overflow-y-auto px-2 py-2 flex flex-col gap-0.5">
+                <p className="text-xs font-semibold tracking-wider px-2 py-1.5" style={{ color: 'var(--color-text-muted)' }}>
+                    ROOMS
+                </p>
+                {rooms.length === 0 && (
+                    <p className="text-sm px-2 py-2" style={{ color: 'var(--color-text-muted)' }}>
+                        No rooms yet — click + to join one.
+                    </p>
+                )}
+                {rooms.map(room => (
+                    <div key={room.roomName}
+                        className={`sidebar-item group ${activeRoom === room.roomName ? 'active' : ''}`}
+                        onClick={() => onSelectRoom(room.roomName)}>
+                        <Hash size={15} />
+                        <span className="flex-1 text-sm truncate">{room.roomName}</span>
+                        {activeRoom === room.roomName && (
+                            <button onClick={(e) => { e.stopPropagation(); onLeaveRoom(room.roomName) }}
+                                className="opacity-0 group-hover:opacity-100 hover:text-red-500 p-0.5 transition-opacity"
+                                title="Leave room">
+                                <Trash2 size={13} />
+                            </button>
+                        )}
+                    </div>
+                ))}
+            </div>
+
+            {/* User profile */}
+            <div className="border-t border-base px-3 py-3 flex items-center gap-2.5">
+                <Avatar seed={user?.avatarSeed} username={user?.username} size={36} />
+                <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate" style={{ color: 'var(--color-text)' }}>
+                        {user?.username || 'Loading…'}
+                    </p>
+                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>You</p>
+                </div>
+                <button onClick={onGoToLanding} className="btn-ghost p-1.5 rounded-md" title="Back to home">
+                    <LogOut size={15} />
+                </button>
+            </div>
+
+            {/* Drag handle */}
+            <div
+                onMouseDown={onMouseDown}
+                className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize z-10 group"
+                title="Drag to resize"
+            >
+                <div className="h-full w-0.5 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+                    style={{ background: 'var(--color-accent)' }} />
+            </div>
+        </aside>
+    )
+}

@@ -1,0 +1,155 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-bg: #f8f8f8;
+    --color-surface: #ffffff;
+    --color-surface-2: #f1f1f1;
+    --color-border: #e2e2e2;
+    --color-text: #111111;
+    --color-text-muted: #666666;
+    --color-accent: #ef4444;
+    --color-accent-hover: #dc2626;
+  }
+
+  .dark {
+    --color-bg: #0f0f0f;
+    --color-surface: #1a1a1a;
+    --color-surface-2: #242424;
+    --color-border: #2e2e2e;
+    --color-text: #eeeeee;
+    --color-text-muted: #888888;
+    --color-accent: #f87171;
+    --color-accent-hover: #ef4444;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-size: 17px;
+    /* scales all rem-based Tailwind sizes up ~6% */
+  }
+
+  body {
+    @apply font-sans;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    transition: background-color 0.2s, color 0.2s;
+  }
+
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 2px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-muted);
+  }
+
+  ::selection {
+    background-color: var(--color-accent);
+    color: white;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply px-4 py-2.5 text-sm font-semibold text-white rounded transition-all duration-150 active:scale-95;
+    background-color: var(--color-accent);
+  }
+
+  .btn-primary:hover {
+    background-color: var(--color-accent-hover);
+  }
+
+  .btn-ghost {
+    @apply px-4 py-2.5 text-sm font-medium rounded transition-all duration-150 active:scale-95;
+    color: var(--color-text-muted);
+    background-color: transparent;
+  }
+
+  .btn-ghost:hover {
+    background-color: var(--color-surface-2);
+    color: var(--color-text);
+  }
+
+  .surface {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+  }
+
+  .surface-2 {
+    background-color: var(--color-surface-2);
+  }
+
+  .input-field {
+    @apply w-full px-3 py-2.5 text-sm rounded outline-none transition-all duration-150;
+    background-color: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+  }
+
+  .input-field:focus {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 20%, transparent);
+  }
+
+  .input-field::placeholder {
+    color: var(--color-text-muted);
+  }
+
+  .sidebar-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded cursor-pointer transition-all duration-150 select-none text-sm;
+    color: var(--color-text-muted);
+  }
+
+  .sidebar-item:hover {
+    background-color: var(--color-surface-2);
+    color: var(--color-text);
+  }
+
+  .sidebar-item.active {
+    background-color: color-mix(in srgb, var(--color-accent) 12%, transparent);
+    color: var(--color-accent);
+  }
+
+  .avatar-ring {
+    @apply ring-2;
+    ring-color: var(--color-accent);
+  }
+}
+
+@layer utilities {
+  .text-accent {
+    color: var(--color-accent);
+  }
+
+  .bg-surface {
+    background-color: var(--color-surface);
+  }
+
+  .bg-surface-2 {
+    background-color: var(--color-surface-2);
+  }
+
+  .border-base {
+    border-color: var(--color-border);
+  }
+
+  .text-muted {
+    color: var(--color-text-muted);
+  }
+}
