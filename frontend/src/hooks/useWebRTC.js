@@ -18,6 +18,7 @@ export function useWebRTC({ signalingWsRef, localPeerId, localUser, onMessage, o
     const peerConnections = useRef(new Map()) // peerId → RTCPeerConnection
     const dataChannels = useRef(new Map())  // peerId → RTCDataChannel
     const inboundFiles = useRef(new Map())  // peerId → { meta, chunks[] }
+    const pendingMessages = useRef(new Map()) // peerId → Array<{type, payload}> queued while DC is 'connecting'
 
     // ── Callback refs: always call the latest version of each prop callback ────────
     // This is the fix for the stale-closure bug: channel.onmessage is set ONCE,
@@ -97,7 +98,17 @@ export function useWebRTC({ signalingWsRef, localPeerId, localUser, onMessage, o
         channel.binaryType = 'arraybuffer'
         channel.onmessage = (evt) => handleDataChannelMessage(peerId, evt)
         channel.onerror = (e) => console.warn('[DC error]', peerId, e)
-        channel.onopen = () => console.info('[DC open]', peerId)
+        channel.onopen = () => {
+            console.info('[DC open]', peerId)
+            // Drain any messages that were queued while the channel was 'connecting'
+            const queue = pendingMessages.current.get(peerId) || []
+            pendingMessages.current.delete(peerId)
+            for (const item of queue) {
+                try {
+                    if (item.type === 'text') channel.send(item.payload)
+                } catch (e) { console.warn('[DC flush error]', e) }
+            }
+        }
         dataChannels.current.set(peerId, channel)
     }, [handleDataChannelMessage])
 
@@ -107,6 +118,7 @@ export function useWebRTC({ signalingWsRef, localPeerId, localUser, onMessage, o
         peerConnections.current.delete(peerId)
         dataChannels.current.delete(peerId)
         inboundFiles.current.delete(peerId)
+        pendingMessages.current.delete(peerId)
     }, [])
 
     // ── Create RTCPeerConnection ───────────────────────────────────────────────────
@@ -188,13 +200,18 @@ export function useWebRTC({ signalingWsRef, localPeerId, localUser, onMessage, o
             text,
         })
         let sent = 0
-        for (const [, channel] of dataChannels.current) {
+        for (const [peerId, channel] of dataChannels.current) {
             if (channel.readyState === 'open') {
                 channel.send(msg)
                 sent++
+            } else if (channel.readyState === 'connecting') {
+                // Queue it — will be sent once the channel opens
+                if (!pendingMessages.current.has(peerId)) pendingMessages.current.set(peerId, [])
+                pendingMessages.current.get(peerId).push({ type: 'text', payload: msg })
+                sent++ // count as "handled" to suppress the warning
             }
         }
-        if (sent === 0) console.warn('[broadcastText] no open data channels; channels:', [...dataChannels.current.entries()].map(([id, ch]) => `${id.slice(0, 8)}:${ch.readyState}`))
+        if (sent === 0) console.warn('[broadcastText] no open/connecting data channels; channels:', [...dataChannels.current.entries()].map(([id, ch]) => `${id.slice(0, 8)}:${ch.readyState}`))
     }, []) // stable — uses refs
 
     // ── Send a file to all open data channels ─────────────────────────────────────

@@ -24,7 +24,21 @@ export default function Sidebar({
     const [roomInput, setRoomInput] = useState('')
     const [passInput, setPassInput] = useState('')
     const [isCreating, setIsCreating] = useState(false)
+    const [formError, setFormError] = useState('')
     const dragging = useRef(false)
+
+    // ── Validation (mirrors backend Pydantic constraints) ─────────────────────────
+    const ROOM_PATTERN = /^[a-z0-9-]+$/
+    function validateForm(room, pass) {
+        const r = room.trim().toLowerCase()
+        const p = pass.trim()
+        if (r.length < 3) return 'Room name must be at least 3 characters.'
+        if (r.length > 128) return 'Room name must be 128 characters or fewer.'
+        if (!ROOM_PATTERN.test(r)) return 'Room name can only contain lowercase letters, numbers, and hyphens.'
+        if (p.length < 8) return 'Password must be at least 8 characters.'
+        if (p.length > 128) return 'Password must be 128 characters or fewer.'
+        return ''
+    }
 
     // ── Resize drag handle ────────────────────────────────────────────────────────
     const onMouseDown = useCallback((e) => {
@@ -55,7 +69,9 @@ export default function Sidebar({
 
     function handleSubmit(e) {
         e.preventDefault()
-        if (!roomInput.trim() || !passInput.trim()) return
+        const error = validateForm(roomInput, passInput)
+        if (error) { setFormError(error); return }
+        setFormError('')
         onJoinRoom(roomInput.trim().toLowerCase(), passInput.trim(), isCreating)
         setRoomInput('')
         setPassInput('')
@@ -80,7 +96,7 @@ export default function Sidebar({
                     <button onClick={onToggleTheme} className="btn-ghost p-2 rounded-md" title="Toggle theme">
                         {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
                     </button>
-                    <button onClick={() => setShowJoinPanel(v => !v)}
+                    <button onClick={() => { setShowJoinPanel(v => !v); setFormError(''); setRoomInput(''); setPassInput('') }}
                         className="btn-ghost p-2 rounded-md" title="Join or create room">
                         <Plus size={16} style={{ color: showJoinPanel ? 'var(--color-accent)' : undefined }} />
                     </button>
@@ -106,7 +122,8 @@ export default function Sidebar({
                         <input className="input-field flex-1 text-sm py-2"
                             placeholder="room-name"
                             value={roomInput}
-                            onChange={e => setRoomInput(e.target.value)} />
+                            maxLength={128}
+                            onChange={e => { setRoomInput(e.target.value); setFormError('') }} />
                         {isCreating && (
                             <button type="button" onClick={handleGenerateRoom}
                                 className="btn-ghost px-2.5 text-base border border-base rounded" title="Generate room name">
@@ -118,7 +135,13 @@ export default function Sidebar({
                         placeholder="password"
                         type="password"
                         value={passInput}
-                        onChange={e => setPassInput(e.target.value)} />
+                        maxLength={128}
+                        onChange={e => { setPassInput(e.target.value); setFormError('') }} />
+                    {formError && (
+                        <p className="text-xs px-0.5" style={{ color: 'var(--color-error, #f87171)' }}>
+                            {formError}
+                        </p>
+                    )}
                     <button type="submit" className="btn-primary text-sm py-2 rounded-md">
                         {isCreating ? 'Create Room' : 'Join Room'}
                     </button>
