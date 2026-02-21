@@ -1,5 +1,5 @@
 // Sidebar.jsx — Left navigation: rooms list + user profile (with drag-to-resize & mobile overlay)
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { Plus, Hash, Shield, LogOut, Trash2, Sun, Moon, X } from 'lucide-react'
 import { generateRoomName } from '../utils/generators.js'
 import Avatar from './Avatar.jsx'
@@ -28,6 +28,22 @@ export default function Sidebar({
     const [isCreating, setIsCreating] = useState(false)
     const [formError, setFormError] = useState('')
     const dragging = useRef(false)
+
+    const [visibleCount, setVisibleCount] = useState(20)
+    const observerTarget = useRef(null)
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            entries => {
+                if (entries[0].isIntersecting) {
+                    setVisibleCount(prev => Math.min(prev + 20, rooms.length))
+                }
+            },
+            { threshold: 0.1 }
+        )
+        if (observerTarget.current) observer.observe(observerTarget.current)
+        return () => observer.disconnect()
+    }, [rooms.length])
 
     // ── Validation (mirrors backend Pydantic constraints) ─────────────────────────
     const ROOM_PATTERN = /^[a-z0-9-]+$/
@@ -218,12 +234,15 @@ export default function Sidebar({
                             No rooms yet — click + to join one.
                         </p>
                     )}
-                    {rooms.map(room => (
+                    {rooms.slice(0, visibleCount).map(room => (
                         <div key={room.roomName}
                             className={`sidebar-item group ${activeRoom === room.roomName ? 'active' : ''}`}
                             onClick={() => handleSelectRoom(room.roomName)}>
                             <Hash size={15} />
                             <span className="flex-1 text-sm truncate">{room.roomName}</span>
+                            {room.hasUnread && activeRoom !== room.roomName && (
+                                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: 'var(--color-accent)' }} />
+                            )}
                             {activeRoom === room.roomName && (
                                 <button onClick={(e) => { e.stopPropagation(); onLeaveRoom(room.roomName) }}
                                     className="opacity-0 group-hover:opacity-100 hover:text-red-500 p-0.5 transition-opacity"
@@ -233,6 +252,9 @@ export default function Sidebar({
                             )}
                         </div>
                     ))}
+                    {visibleCount < rooms.length && (
+                        <div ref={observerTarget} className="h-4" />
+                    )}
                 </div>
 
                 {/* User profile */}

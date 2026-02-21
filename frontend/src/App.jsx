@@ -5,7 +5,7 @@ import Sidebar from './components/Sidebar.jsx'
 import ChatWindow from './components/ChatWindow.jsx'
 import ConfirmModal from './components/ConfirmModal.jsx'
 import { generateUsername, generateAvatarSeed } from './utils/generators.js'
-import { getPrefs, savePrefs, getRooms, saveRoom, deleteRoom, getMessages, getMessagesPage, addMessage, wipeAllData } from './hooks/useIndexedDB.js'
+import { getPrefs, savePrefs, getRooms, saveRoom, deleteRoom, getMessages, getMessagesPage, addMessage, wipeAllData, updateRoomActivity, clearUnread } from './hooks/useIndexedDB.js'
 import { useWebRTC } from './hooks/useWebRTC.js'
 
 const WS_BASE = import.meta.env.VITE_WS_URL || 'ws://localhost:8000'
@@ -76,12 +76,55 @@ export default function App() {
     })
   }
 
+  // ── Room Activity Sync (Cross-tab) ──────────────────────────────────────────
+  useEffect(() => {
+    const bc = new BroadcastChannel('anzen-rooms')
+    bc.onmessage = (e) => {
+      if (e.data.type === 'activity') {
+        const { roomName } = e.data
+        setRooms(prev => {
+          const next = [...prev]
+          const idx = next.findIndex(r => r.roomName === roomName)
+          if (idx !== -1) {
+            const isUnread = roomName !== activeRoom
+            next[idx] = { ...next[idx], lastMessageAt: Date.now(), hasUnread: isUnread }
+            const [room] = next.splice(idx, 1)
+            next.unshift(room)
+          }
+          return next
+        })
+      }
+    }
+    return () => bc.close()
+  }, [activeRoom])
+
+  const notifyRoomActivity = useCallback(async (roomName) => {
+    const isUnread = roomName !== activeRoom
+    await updateRoomActivity(roomName, isUnread)
+
+    setRooms(prev => {
+      const next = [...prev]
+      const idx = next.findIndex(r => r.roomName === roomName)
+      if (idx !== -1) {
+        next[idx] = { ...next[idx], lastMessageAt: Date.now(), hasUnread: isUnread }
+        const [room] = next.splice(idx, 1)
+        next.unshift(room)
+      }
+      return next
+    })
+
+    const bc = new BroadcastChannel('anzen-rooms')
+    bc.postMessage({ type: 'activity', roomName })
+    bc.close()
+  }, [activeRoom])
+
   // ── WebRTC callbacks ──────────────────────────────────────────────────────────
   const handleIncomingMessage = useCallback(async (msg) => {
     if (!activeRoom) return
     setMessages(prev => [...prev, msg])
     await addMessage(activeRoom, msg)
-  }, [activeRoom])
+    await notifyRoomActivity(activeRoom)
+  }, [activeRoom, notifyRoomActivity])
 
   const handlePeerJoined = useCallback((peerId) => {
     const meta = peerMetaRef.current.get(peerId) || { username: 'Unknown', avatarSeed: peerId }
@@ -233,6 +276,10 @@ export default function App() {
     const room = rooms.find(r => r.roomName === roomName)
     if (!room) return
     setActiveRoom(roomName)
+
+    await clearUnread(roomName)
+    setRooms(prev => prev.map(r => r.roomName === roomName ? { ...r, hasUnread: false } : r))
+
     await loadInitialMessages(roomName)
     openSignalingWs(roomName, room.password)
   }
@@ -304,6 +351,7 @@ export default function App() {
     broadcastText(text)
     setMessages(prev => [...prev, msg])
     await addMessage(activeRoom, msg)
+    await notifyRoomActivity(activeRoom)
   }
 
   async function handleSendFile(file) {
@@ -327,6 +375,7 @@ export default function App() {
     }
     setMessages(prev => [...prev, msg])
     await addMessage(activeRoom, msg)
+    await notifyRoomActivity(activeRoom)
   }
 
 

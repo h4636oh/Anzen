@@ -27,11 +27,30 @@ export async function getRooms() {
     await roomsStore.iterate((value, key) => {
         rooms.push({ roomName: key, ...value })
     })
-    return rooms
+    return rooms.sort((a, b) => (b.lastMessageAt || b.joinedAt || 0) - (a.lastMessageAt || a.joinedAt || 0))
 }
 
 export async function saveRoom(roomName, data) {
-    await roomsStore.setItem(roomName, { ...data, joinedAt: Date.now() })
+    const existing = await roomsStore.getItem(roomName)
+    if (!existing) {
+        await roomsStore.setItem(roomName, { ...data, joinedAt: Date.now(), lastMessageAt: Date.now(), hasUnread: false })
+    } else {
+        await roomsStore.setItem(roomName, { ...existing, ...data })
+    }
+}
+
+export async function updateRoomActivity(roomName, hasUnread = false) {
+    const data = await roomsStore.getItem(roomName)
+    if (data) {
+        await roomsStore.setItem(roomName, { ...data, lastMessageAt: Date.now(), hasUnread })
+    }
+}
+
+export async function clearUnread(roomName) {
+    const data = await roomsStore.getItem(roomName)
+    if (data && data.hasUnread) {
+        await roomsStore.setItem(roomName, { ...data, hasUnread: false })
+    }
 }
 
 export async function deleteRoom(roomName) {
