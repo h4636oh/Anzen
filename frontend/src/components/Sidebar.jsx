@@ -176,7 +176,8 @@ export default function Sidebar({
             </div>
 
             {/* User profile */}
-            <div className="border-t border-base px-3 py-3 flex items-center gap-2.5">
+            <div className="border-t border-base px-3 flex items-center gap-2.5"
+                style={{ height: '72px' }}>
                 <Avatar seed={user?.avatarSeed} username={user?.username} size={36} />
                 <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate" style={{ color: 'var(--color-text)' }}>

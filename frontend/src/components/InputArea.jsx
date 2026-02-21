@@ -33,8 +33,8 @@ export default function InputArea({ onSendText, onSendFile, disabled }) {
 
     return (
         <form onSubmit={handleSubmit}
-            className="flex items-end gap-2 px-4 py-3 border-t border-base"
-            style={{ background: 'var(--color-surface)' }}>
+            className="flex items-stretch gap-2 px-4 py-3 border-t border-base"
+            style={{ background: 'var(--color-surface)', height: '72px' }}>
 
             {/* File preview pill */}
             {pendingFile && (
@@ -62,7 +62,7 @@ export default function InputArea({ onSendText, onSendFile, disabled }) {
 
             {/* Attach */}
             <button type="button"
-                className="btn-ghost p-2 rounded-lg border border-base flex-shrink-0"
+                className="btn-ghost !p-0 rounded-lg border border-base flex-shrink-0 self-stretch aspect-square flex items-center justify-center"
                 disabled={disabled}
                 onClick={() => fileRef.current?.click()}
                 title="Attach file">
@@ -73,7 +73,7 @@ export default function InputArea({ onSendText, onSendFile, disabled }) {
             {/* Send */}
             <button type="submit"
                 disabled={disabled || (!text.trim() && !pendingFile)}
-                className="p-2 rounded-lg flex-shrink-0 transition-all duration-150 active:scale-95 disabled:opacity-40"
+                className="rounded-lg flex-shrink-0 self-stretch aspect-square flex items-center justify-center transition-all duration-150 active:scale-95 disabled:opacity-40"
                 style={{ background: 'var(--color-accent)', color: 'white' }}>
                 <Send size={16} />
             </button>
