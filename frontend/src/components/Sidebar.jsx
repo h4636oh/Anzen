@@ -126,7 +126,8 @@ export default function Sidebar({
                             onChange={e => { setRoomInput(e.target.value); setFormError('') }} />
                         {isCreating && (
                             <button type="button" onClick={handleGenerateRoom}
-                                className="btn-ghost px-2.5 text-base border border-base rounded" title="Generate room name">
+                                className="btn-ghost !py-0 !px-2.5 self-stretch text-base border border-base rounded flex items-center justify-center"
+                                title="Generate room name">
                                 ⚄
                             </button>
                         )}
@@ -146,7 +147,8 @@ export default function Sidebar({
                         {isCreating ? 'Create Room' : 'Join Room'}
                     </button>
                 </form>
-            )}
+            )
+            }
 
             {/* Rooms list */}
             <div className="flex-1 overflow-y-auto px-2 py-2 flex flex-col gap-0.5">
@@ -199,6 +201,6 @@ export default function Sidebar({
                 <div className="h-full w-0.5 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
                     style={{ background: 'var(--color-accent)' }} />
             </div>
-        </aside>
+        </aside >
     )
 }
