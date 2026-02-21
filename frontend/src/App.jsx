@@ -4,6 +4,7 @@ import LandingPage from './components/LandingPage.jsx'
 import Sidebar from './components/Sidebar.jsx'
 import ChatWindow from './components/ChatWindow.jsx'
 import ConfirmModal from './components/ConfirmModal.jsx'
+import LockScreen from './components/LockScreen.jsx'
 import { generateUsername, generateAvatarSeed } from './utils/generators.js'
 import { getPrefs, savePrefs, getRooms, saveRoom, deleteRoom, getMessages, getMessagesPage, addMessage, wipeAllData, updateRoomActivity, clearUnread } from './hooks/useIndexedDB.js'
 import { useWebRTC } from './hooks/useWebRTC.js'
@@ -19,6 +20,11 @@ export default function App() {
 
   // ── Navigation ────────────────────────────────────────────────────────────────
   const [view, setView] = useState('landing')  // 'landing' | 'chat'
+
+  // ── Inactivity Lock ───────────────────────────────────────────────────────────
+  const [isLocked, setIsLocked] = useState(false)
+  const lastActivityAt = useRef(Date.now())
+  const INACTIVITY_LIMIT_MS = 5 * 60 * 1000 // 5 minutes
 
   // ── Sidebar width (resizable) & mobile visibility ───────────────────────────
   const [sidebarWidth, setSidebarWidth] = useState(260)
@@ -124,6 +130,41 @@ export default function App() {
     bc.postMessage({ type: 'activity', roomName })
     bc.close()
   }, [activeRoom])
+
+  // ── Inactivity Tracker ────────────────────────────────────────────────────────
+  useEffect(() => {
+    function updateActivity() {
+      lastActivityAt.current = Date.now()
+    }
+
+    // Attach listeners
+    window.addEventListener('mousemove', updateActivity)
+    window.addEventListener('keydown', updateActivity)
+    window.addEventListener('click', updateActivity)
+    window.addEventListener('scroll', updateActivity, true)
+    window.addEventListener('touchstart', updateActivity)
+
+    // Check periodically
+    const interval = setInterval(() => {
+      // Only lock if we have a valid password set and we're not already on the landing page
+      // Actually, locking on landing page is fine too if they entered the password but walked away,
+      // but usually they just close it. Let's lock if appPasswordHash is valid, not 'SKIP', and we aren't locked.
+      if (!isLocked && appPasswordHash && appPasswordHash !== 'SKIP') {
+        if (Date.now() - lastActivityAt.current > INACTIVITY_LIMIT_MS) {
+          setIsLocked(true)
+        }
+      }
+    }, 10000) // Check every 10 seconds
+
+    return () => {
+      window.removeEventListener('mousemove', updateActivity)
+      window.removeEventListener('keydown', updateActivity)
+      window.removeEventListener('click', updateActivity)
+      window.removeEventListener('scroll', updateActivity, true)
+      window.removeEventListener('touchstart', updateActivity)
+      clearInterval(interval)
+    }
+  }, [isLocked, appPasswordHash, INACTIVITY_LIMIT_MS])
 
   // ── WebRTC callbacks ──────────────────────────────────────────────────────────
   const handleIncomingMessage = useCallback(async (msg) => {
@@ -403,14 +444,28 @@ export default function App() {
   // ── Render ────────────────────────────────────────────────────────────────────
   if (view === 'landing') {
     return (
-      <LandingPage
-        onEnterChat={() => setView('chat')}
-        onClearChat={handleClearChat}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-        appPasswordHash={appPasswordHash}
-        onSaveAppPassword={handleSaveAppPassword}
-      />
+      <>
+        <LandingPage
+          onEnterChat={() => {
+            lastActivityAt.current = Date.now()
+            setView('chat')
+          }}
+          onClearChat={handleClearChat}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          appPasswordHash={appPasswordHash}
+          onSaveAppPassword={handleSaveAppPassword}
+        />
+        {isLocked && (
+          <LockScreen
+            appPasswordHash={appPasswordHash}
+            onUnlock={() => {
+              setIsLocked(false)
+              lastActivityAt.current = Date.now()
+            }}
+          />
+        )}
+      </>
     )
   }
 
@@ -418,6 +473,15 @@ export default function App() {
 
   return (
     <div className="flex h-screen overflow-hidden">
+      {isLocked && (
+        <LockScreen
+          appPasswordHash={appPasswordHash}
+          onUnlock={() => {
+            setIsLocked(false)
+            lastActivityAt.current = Date.now()
+          }}
+        />
+      )}
       <Sidebar
         user={user}
         rooms={rooms}
