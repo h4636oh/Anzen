@@ -9,20 +9,20 @@ import { Download, FileText } from 'lucide-react'
  *   isOwn       — boolean, true if sent by local user
  *   showHeader  — boolean, show avatar + name (false if same sender as previous)
  */
-export default function MessageBubble({ msg, isOwn, showHeader }) {
+export default function MessageBubble({ msg, isOwn, showHeader, showTime }) {
     const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
     return (
-        <div className={`flex gap-2 px-4 ${showHeader ? 'mt-3' : 'mt-0.5'} ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
-            {/* Avatar — only show on first message in a sequence */}
-            <div className="flex-shrink-0" style={{ width: 32 }}>
-                {showHeader && !isOwn && (
-                    <Avatar seed={msg.avatarSeed} username={msg.senderName} size={32} />
+        <div className={`flex gap-2 px-2 md:px-4 ${showHeader ? 'mt-3' : 'mt-0.5'} ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
+            {/* Avatar / spacer */}
+            <div className="flex-shrink-0" style={{ width: isOwn ? 8 : 24 }}>
+                {!isOwn && showHeader && (
+                    <Avatar seed={msg.avatarSeed} username={msg.senderName} size={24} />
                 )}
             </div>
 
             {/* Content */}
-            <div className={`flex flex-col flex-1 ${isOwn ? 'items-end' : 'items-start'}`}>
+            <div className={`flex flex-col flex-1 min-w-0 ${isOwn ? 'items-end' : 'items-start'}`}>
                 {showHeader && (
                     <p className="text-xs font-medium mb-1" style={{ color: isOwn ? 'var(--color-accent)' : 'var(--color-text-muted)' }}>
                         {isOwn ? 'You' : msg.senderName}
@@ -30,8 +30,8 @@ export default function MessageBubble({ msg, isOwn, showHeader }) {
                 )}
 
                 {msg.type === 'text' && (
-                    <div className="max-w-xs lg:max-w-md">
-                        <div className={`px-3 py-2 rounded-xl text-sm leading-relaxed break-words ${isOwn ? 'rounded-tr-sm' : 'rounded-tl-sm'
+                    <div style={{ maxWidth: 'min(90%, 24rem)' }}>
+                        <div className={`px-3 py-2 rounded-xl text-sm leading-relaxed break-words overflow-hidden ${isOwn ? 'rounded-tr-sm' : 'rounded-tl-sm'
                             }`}
                             style={{
                                 background: isOwn ? 'var(--color-accent)' : 'var(--color-surface-2)',
@@ -66,7 +66,9 @@ export default function MessageBubble({ msg, isOwn, showHeader }) {
                     </a>
                 )}
 
-                <span className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{time}</span>
+                {showTime && (
+                    <span className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{time}</span>
+                )}
             </div>
         </div>
     )

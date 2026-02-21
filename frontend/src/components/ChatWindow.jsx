@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Hash, Users, Lock, AlertCircle, RefreshCw, Loader, Menu } from 'lucide-react'
 import MessageBubble from './MessageBubble.jsx'
+import DateSeparator from './DateSeparator.jsx'
 import InputArea from './InputArea.jsx'
 import AboutRoomModal from './AboutRoomModal.jsx'
 import Avatar from './Avatar.jsx'
@@ -100,32 +101,44 @@ export default function ChatWindow({ room, messages, peers, localUser, connectio
             )}
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto py-3">
-                {messages.length === 0 && (
-                    <div className="flex flex-col items-center justify-center h-full gap-3 px-4">
-                        <div className="w-12 h-12 rounded-xl flex items-center justify-center"
-                            style={{ background: 'color-mix(in srgb, var(--color-accent) 12%, transparent)' }}>
-                            <Lock size={22} style={{ color: 'var(--color-accent)' }} />
+            <div className="flex-1 overflow-y-auto">
+                <div className="min-h-full flex flex-col justify-end py-2">
+                    {messages.length === 0 && (
+                        <div className="flex flex-col items-center justify-center flex-1 gap-3 px-4">
+                            <div className="w-12 h-12 rounded-xl flex items-center justify-center"
+                                style={{ background: 'color-mix(in srgb, var(--color-accent) 12%, transparent)' }}>
+                                <Lock size={22} style={{ color: 'var(--color-accent)' }} />
+                            </div>
+                            <p className="text-sm text-center" style={{ color: 'var(--color-text-muted)' }}>
+                                {failed
+                                    ? 'Connection failed — see the error above.'
+                                    : connected
+                                        ? 'Messages are end-to-end encrypted. Say hello! 👋'
+                                        : 'Waiting to connect…'
+                                }
+                            </p>
                         </div>
-                        <p className="text-sm text-center" style={{ color: 'var(--color-text-muted)' }}>
-                            {failed
-                                ? 'Connection failed — see the error above.'
-                                : connected
-                                    ? 'Messages are end-to-end encrypted. Say hello! 👋'
-                                    : 'Waiting to connect…'
-                            }
-                        </p>
-                    </div>
-                )}
-                {messages.map((msg, idx) => {
-                    const prev = messages[idx - 1]
-                    const showHeader = !prev || prev.senderId !== msg.senderId
-                    const isOwn = msg.senderId === localUser?.peerId
-                    return (
-                        <MessageBubble key={msg.id} msg={msg} isOwn={isOwn} showHeader={showHeader} />
-                    )
-                })}
-                <div ref={bottomRef} />
+                    )}
+                    {messages.map((msg, idx) => {
+                        const prev = messages[idx - 1]
+                        const next = messages[idx + 1]
+                        const showHeader = !prev || prev.senderId !== msg.senderId
+                        const msgMinute = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        const nextMinute = next ? new Date(next.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null
+                        const showTime = !next || next.senderId !== msg.senderId || nextMinute !== msgMinute
+                        const isOwn = msg.senderId === localUser?.peerId
+                        const msgDay = new Date(msg.timestamp).toDateString()
+                        const prevDay = prev ? new Date(prev.timestamp).toDateString() : null
+                        const showDate = !prev || prevDay !== msgDay
+                        return (
+                            <>
+                                {showDate && <DateSeparator key={`date-${msg.id}`} date={msg.timestamp} />}
+                                <MessageBubble key={msg.id} msg={msg} isOwn={isOwn} showHeader={showHeader} showTime={showTime} />
+                            </>
+                        )
+                    })}
+                    <div ref={bottomRef} />
+                </div>
             </div>
 
             {/* Input */}
