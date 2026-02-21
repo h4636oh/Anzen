@@ -36,29 +36,29 @@ export default function InputArea({ onSendText, onSendFile, disabled }) {
             className="flex items-stretch gap-2 px-4 py-3 border-t border-base"
             style={{ background: 'var(--color-surface)', height: '72px' }}>
 
-            {/* File preview pill */}
-            {pendingFile && (
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-base surface-2 text-xs max-w-xs truncate"
-                    style={{ color: 'var(--color-text)' }}>
-                    <span className="truncate">{pendingFile.name}</span>
-                    <button type="button" onClick={() => setPendingFile(null)} className="flex-shrink-0">
-                        <X size={12} style={{ color: 'var(--color-text-muted)' }} />
-                    </button>
-                </div>
-            )}
-
-            {!pendingFile && (
-                <textarea
-                    className="input-field flex-1 resize-none text-sm leading-relaxed"
-                    rows={1}
-                    placeholder={disabled ? 'Connect to a room to chat…' : 'Message'}
-                    value={text}
-                    disabled={disabled}
-                    onChange={e => setText(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    style={{ maxHeight: 120, overflowY: 'auto' }}
-                />
-            )}
+            {/* Left area: always flex-1 so buttons stay pinned to the right */}
+            <div className="flex-1 flex items-center min-w-0">
+                {pendingFile ? (
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-base surface-2 text-xs max-w-xs truncate"
+                        style={{ color: 'var(--color-text)' }}>
+                        <span className="truncate">{pendingFile.name}</span>
+                        <button type="button" onClick={() => setPendingFile(null)} className="flex-shrink-0">
+                            <X size={12} style={{ color: 'var(--color-text-muted)' }} />
+                        </button>
+                    </div>
+                ) : (
+                    <textarea
+                        className="input-field w-full resize-none text-sm leading-relaxed"
+                        rows={1}
+                        placeholder={disabled ? 'Connect to a room to chat…' : 'Message'}
+                        value={text}
+                        disabled={disabled}
+                        onChange={e => setText(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        style={{ maxHeight: 120, overflowY: 'auto' }}
+                    />
+                )}
+            </div>
 
             {/* Attach */}
             <button type="button"
