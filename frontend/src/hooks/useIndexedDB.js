@@ -36,6 +36,7 @@ export async function saveRoom(roomName, data) {
 
 export async function deleteRoom(roomName) {
     await roomsStore.removeItem(roomName)
+    await messagesStore.removeItem(roomName)
 }
 
 // ── Messages ──────────────────────────────────────────────────────────────────
