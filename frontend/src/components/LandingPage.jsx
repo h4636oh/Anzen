@@ -1,9 +1,13 @@
 // LandingPage.jsx — Entry point: Chat or Clear Chat
 import { useState } from 'react'
-import { Sun, Moon, Shield, ArrowRight, Trash2 } from 'lucide-react'
+import { Sun, Moon, Shield, ArrowRight, Trash2, KeyRound, X } from 'lucide-react'
+import { hashPassword } from '../utils/crypto.js'
 
-export default function LandingPage({ onEnterChat, onClearChat, theme, onToggleTheme }) {
+export default function LandingPage({ onEnterChat, onClearChat, theme, onToggleTheme, appPasswordHash, onSaveAppPassword }) {
     const [confirmClear, setConfirmClear] = useState(false)
+    const [authMode, setAuthMode] = useState(null) // 'create' | 'enter' | null
+    const [passwordInput, setPasswordInput] = useState('')
+    const [authError, setAuthError] = useState('')
 
     function handleClear() {
         if (confirmClear) {
@@ -12,6 +16,47 @@ export default function LandingPage({ onEnterChat, onClearChat, theme, onToggleT
         } else {
             setConfirmClear(true)
         }
+    }
+
+    function handleChatClick() {
+        if (!appPasswordHash) {
+            setAuthMode('create')
+            setPasswordInput('')
+            setAuthError('')
+        } else if (appPasswordHash === 'SKIP') {
+            onEnterChat()
+        } else {
+            setAuthMode('enter')
+            setPasswordInput('')
+            setAuthError('')
+        }
+    }
+
+    async function handleAuthSubmit(e) {
+        e.preventDefault()
+        setAuthError('')
+
+        if (authMode === 'create') {
+            if (!passwordInput.trim()) {
+                setAuthError('Password cannot be empty.')
+                return
+            }
+            const hash = await hashPassword(passwordInput)
+            await onSaveAppPassword(hash)
+            onEnterChat()
+        } else if (authMode === 'enter') {
+            const hash = await hashPassword(passwordInput)
+            if (hash === appPasswordHash) {
+                onEnterChat()
+            } else {
+                setAuthError('Incorrect password.')
+            }
+        }
+    }
+
+    async function handleSkipPassword() {
+        await onSaveAppPassword('SKIP')
+        onEnterChat()
     }
 
     return (
@@ -51,7 +96,7 @@ export default function LandingPage({ onEnterChat, onClearChat, theme, onToggleT
 
                 {/* CTA */}
                 <div className="w-full flex flex-col gap-3">
-                    <button onClick={onEnterChat}
+                    <button onClick={handleChatClick}
                         className="btn-primary w-full flex items-center justify-center gap-2 py-3 rounded-lg text-base">
                         Chat
                         <ArrowRight size={16} />
@@ -83,6 +128,71 @@ export default function LandingPage({ onEnterChat, onClearChat, theme, onToggleT
                     <span className="text-accent font-medium">安全</span> · Anzen means "safety" in Japanese
                 </p>
             </div>
+
+            {/* Auth Modal */}
+            {authMode && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center px-4"
+                    style={{ background: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(2px)' }}>
+                    <div className="surface w-full max-w-sm rounded-xl p-6 shadow-2xl relative">
+                        <button onClick={() => setAuthMode(null)}
+                            className="absolute top-4 right-4 text-base p-1 hover:opacity-75 transition-opacity"
+                            style={{ color: 'var(--color-text-muted)' }}>
+                            <X size={18} />
+                        </button>
+
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-lg flex items-center justify-center"
+                                style={{ background: 'var(--color-surface-hover)' }}>
+                                <KeyRound size={20} style={{ color: 'var(--color-accent)' }} />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold">
+                                    {authMode === 'create' ? 'App Password' : 'Enter Password'}
+                                </h3>
+                                <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                                    {authMode === 'create'
+                                        ? 'Protect your local chat data.'
+                                        : 'Unlock your chat application.'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <form onSubmit={handleAuthSubmit} className="flex flex-col gap-4">
+                            <div>
+                                <input
+                                    type="password"
+                                    value={passwordInput}
+                                    onChange={(e) => setPasswordInput(e.target.value)}
+                                    placeholder="Enter password"
+                                    autoFocus
+                                    className="w-full px-4 py-2 bg-transparent border rounded-lg focus:outline-none focus:ring-1 transition-all"
+                                    style={{
+                                        borderColor: 'var(--color-border)',
+                                        color: 'var(--color-text)',
+                                        '--tw-ring-color': 'var(--color-accent)'
+                                    }}
+                                />
+                                {authError && (
+                                    <p className="text-xs mt-2 text-red-500 font-medium">{authError}</p>
+                                )}
+                            </div>
+
+                            <div className="flex gap-2 mt-2">
+                                <button type="submit"
+                                    className="flex-1 btn-primary py-2 rounded-lg text-sm font-semibold">
+                                    {authMode === 'create' ? 'Save & Continue' : 'Unlock'}
+                                </button>
+                                {authMode === 'create' && (
+                                    <button type="button" onClick={handleSkipPassword}
+                                        className="flex-1 btn-ghost py-2 rounded-lg border border-base text-sm font-medium">
+                                        Skip
+                                    </button>
+                                )}
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

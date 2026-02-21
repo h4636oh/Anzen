@@ -15,6 +15,7 @@ export default function App() {
   // ── Identity & theme ─────────────────────────────────────────────────────────
   const [user, setUser] = useState(null)       // { username, avatarSeed, peerId }
   const [theme, setTheme] = useState('dark')
+  const [appPasswordHash, setAppPasswordHash] = useState(null)
 
   // ── Navigation ────────────────────────────────────────────────────────────────
   const [view, setView] = useState('landing')  // 'landing' | 'chat'
@@ -57,6 +58,7 @@ export default function App() {
 
     setUser({ username, avatarSeed, peerId })
     setTheme(savedTheme)
+    setAppPasswordHash(prefs.appPasswordHash || null)
     applyTheme(savedTheme)
 
     const savedRooms = await getRooms()
@@ -74,6 +76,11 @@ export default function App() {
       savePrefs({ theme: next })
       return next
     })
+  }
+
+  async function handleSaveAppPassword(hash) {
+    await savePrefs({ appPasswordHash: hash })
+    setAppPasswordHash(hash)
   }
 
   // ── Room Activity Sync (Cross-tab) ──────────────────────────────────────────
@@ -385,6 +392,7 @@ export default function App() {
     wsRef.current?.close()
     await wipeAllData()
     setUser(null)
+    setAppPasswordHash(null)
     setRooms([])
     setActiveRoom(null)
     setMessages([])
@@ -400,6 +408,8 @@ export default function App() {
         onClearChat={handleClearChat}
         theme={theme}
         onToggleTheme={toggleTheme}
+        appPasswordHash={appPasswordHash}
+        onSaveAppPassword={handleSaveAppPassword}
       />
     )
   }

@@ -12,7 +12,8 @@ export async function getPrefs() {
     const avatarSeed = await prefsStore.getItem('avatarSeed')
     const theme = await prefsStore.getItem('theme')
     const peerId = await prefsStore.getItem('peerId')   // ← was missing, caused new UUID on every reload
-    return { username, avatarSeed, theme, peerId }
+    const appPasswordHash = await prefsStore.getItem('appPasswordHash')
+    return { username, avatarSeed, theme, peerId, appPasswordHash }
 }
 
 export async function savePrefs(prefs) {
