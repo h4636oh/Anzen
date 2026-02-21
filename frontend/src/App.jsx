@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import LandingPage from './components/LandingPage.jsx'
 import Sidebar from './components/Sidebar.jsx'
 import ChatWindow from './components/ChatWindow.jsx'
+import ConfirmModal from './components/ConfirmModal.jsx'
 import { generateUsername, generateAvatarSeed } from './utils/generators.js'
 import { getPrefs, savePrefs, getRooms, saveRoom, deleteRoom, getMessages, getMessagesPage, addMessage, wipeAllData } from './hooks/useIndexedDB.js'
 import { useWebRTC } from './hooks/useWebRTC.js'
@@ -25,6 +26,7 @@ export default function App() {
   // ── Rooms ─────────────────────────────────────────────────────────────────────
   const [rooms, setRooms] = useState([])
   const [activeRoom, setActiveRoom] = useState(null)
+  const [roomToLeave, setRoomToLeave] = useState(null)
   const [messages, setMessages] = useState([])  // messages for activeRoom
   const [peers, setPeers] = useState([])         // [{ id, username, avatarSeed }]
   const [connectionStatus, setConnectionStatus] = useState('idle')
@@ -264,7 +266,15 @@ export default function App() {
     }
   }
 
-  async function handleLeaveRoom(roomName) {
+  function handleLeaveRoom(roomName) {
+    setRoomToLeave(roomName)
+  }
+
+  async function confirmLeaveRoom() {
+    if (!roomToLeave) return
+    const roomName = roomToLeave
+    setRoomToLeave(null)
+
     disconnectAll()
     wsRef.current?.close()
     await deleteRoom(roomName)
@@ -394,6 +404,18 @@ export default function App() {
             Select a room from the sidebar or create one to get started.
           </p>
         </div>
+      )}
+
+      {/* Leave Room Confirmation Modal */}
+      {roomToLeave && (
+        <ConfirmModal
+          title="Leave Room"
+          message={`Are you sure you want to leave the room "${roomToLeave}"?`}
+          confirmText="Leave"
+          onConfirm={confirmLeaveRoom}
+          onCancel={() => setRoomToLeave(null)}
+          isDestructive={true}
+        />
       )}
     </div>
   )
