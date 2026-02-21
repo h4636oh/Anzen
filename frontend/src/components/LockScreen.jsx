@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Shield, KeyRound } from 'lucide-react'
+import { Shield, KeyRound, Eye, EyeOff } from 'lucide-react'
 import { hashPassword } from '../utils/crypto.js'
 
 export default function LockScreen({ appPasswordHash, onUnlock }) {
     const [passwordInput, setPasswordInput] = useState('')
     const [error, setError] = useState('')
+    const [showPassword, setShowPassword] = useState(false)
 
     // Prevent body scroll when locked
     useEffect(() => {
@@ -54,18 +55,27 @@ export default function LockScreen({ appPasswordHash, onUnlock }) {
                             <KeyRound size={16} strokeWidth={2.5} style={{ color: 'var(--color-text-muted)' }} />
                         </div>
                         <input
-                            type="password"
+                            type={showPassword ? 'text' : 'password'}
                             value={passwordInput}
                             onChange={(e) => setPasswordInput(e.target.value)}
                             placeholder="Enter password"
                             autoFocus
-                            className="w-full pl-10 pr-4 py-3 bg-transparent border rounded-xl focus:outline-none focus:ring-2 transition-all font-mono"
+                            className="w-full pl-10 pr-10 py-3 bg-transparent border rounded-xl focus:outline-none focus:ring-2 transition-all font-mono"
                             style={{
                                 borderColor: 'var(--color-border)',
                                 color: 'var(--color-text)',
                                 '--tw-ring-color': 'var(--color-accent)'
                             }}
                         />
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute inset-y-0 right-0 pr-3 flex items-center transition-opacity hover:opacity-80"
+                            style={{ color: 'var(--color-text-muted)' }}
+                            title={showPassword ? "Hide password" : "Show password"}
+                        >
+                            {showPassword ? <EyeOff size={16} strokeWidth={2.5} /> : <Eye size={16} strokeWidth={2.5} />}
+                        </button>
                     </div>
                     {error && (
                         <p className="text-sm text-red-500 font-medium text-center animate-pulse">{error}</p>

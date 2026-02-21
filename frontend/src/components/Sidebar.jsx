@@ -1,6 +1,6 @@
 // Sidebar.jsx — Left navigation: rooms list + user profile (with drag-to-resize & mobile overlay)
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Plus, Hash, Shield, LogOut, Trash2, Sun, Moon, X } from 'lucide-react'
+import { Plus, Hash, Shield, LogOut, Trash2, Sun, Moon, X, Eye, EyeOff } from 'lucide-react'
 import { generateRoomName } from '../utils/generators.js'
 import Avatar from './Avatar.jsx'
 
@@ -26,6 +26,7 @@ export default function Sidebar({
     const [roomInput, setRoomInput] = useState('')
     const [passInput, setPassInput] = useState('')
     const [isCreating, setIsCreating] = useState(false)
+    const [showPassword, setShowPassword] = useState(false)
     const [formError, setFormError] = useState('')
     const dragging = useRef(false)
 
@@ -207,12 +208,23 @@ export default function Sidebar({
                                 </button>
                             )}
                         </div>
-                        <input className="input-field text-sm py-2"
-                            placeholder="password"
-                            type="password"
-                            value={passInput}
-                            maxLength={128}
-                            onChange={e => { setPassInput(e.target.value); setFormError('') }} />
+                        <div className="relative flex">
+                            <input className="input-field text-sm py-2 w-full pr-9"
+                                placeholder="password"
+                                type={showPassword ? "text" : "password"}
+                                value={passInput}
+                                maxLength={128}
+                                onChange={e => { setPassInput(e.target.value); setFormError('') }} />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute inset-y-0 right-0 pr-2.5 flex items-center transition-opacity hover:opacity-80"
+                                style={{ color: 'var(--color-text-muted)' }}
+                                title={showPassword ? "Hide password" : "Show password"}
+                            >
+                                {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
+                        </div>
                         {formError && (
                             <p className="text-xs px-0.5" style={{ color: 'var(--color-error, #f87171)' }}>
                                 {formError}

@@ -1,12 +1,13 @@
 // LandingPage.jsx — Entry point: Chat or Clear Chat
 import { useState } from 'react'
-import { Sun, Moon, Shield, ArrowRight, Trash2, KeyRound, X } from 'lucide-react'
+import { Sun, Moon, Shield, ArrowRight, Trash2, KeyRound, X, Eye, EyeOff } from 'lucide-react'
 import { hashPassword } from '../utils/crypto.js'
 
 export default function LandingPage({ onEnterChat, onClearChat, theme, onToggleTheme, appPasswordHash, onSaveAppPassword }) {
     const [confirmClear, setConfirmClear] = useState(false)
     const [authMode, setAuthMode] = useState(null) // 'create' | 'enter' | null
     const [passwordInput, setPasswordInput] = useState('')
+    const [showPassword, setShowPassword] = useState(false)
     const [authError, setAuthError] = useState('')
 
     function handleClear() {
@@ -22,12 +23,14 @@ export default function LandingPage({ onEnterChat, onClearChat, theme, onToggleT
         if (!appPasswordHash) {
             setAuthMode('create')
             setPasswordInput('')
+            setShowPassword(false)
             setAuthError('')
         } else if (appPasswordHash === 'SKIP') {
             onEnterChat('SKIP')
         } else {
             setAuthMode('enter')
             setPasswordInput('')
+            setShowPassword(false)
             setAuthError('')
         }
     }
@@ -173,19 +176,30 @@ export default function LandingPage({ onEnterChat, onClearChat, theme, onToggleT
                                 </div>
                             )}
                             <div>
-                                <input
-                                    type="password"
-                                    value={passwordInput}
-                                    onChange={(e) => setPasswordInput(e.target.value)}
-                                    placeholder="Enter password"
-                                    autoFocus
-                                    className="w-full px-4 py-2 bg-transparent border rounded-lg focus:outline-none focus:ring-1 transition-all"
-                                    style={{
-                                        borderColor: 'var(--color-border)',
-                                        color: 'var(--color-text)',
-                                        '--tw-ring-color': 'var(--color-accent)'
-                                    }}
-                                />
+                                <div className="relative">
+                                    <input
+                                        type={showPassword ? 'text' : 'password'}
+                                        value={passwordInput}
+                                        onChange={(e) => setPasswordInput(e.target.value)}
+                                        placeholder="Enter password"
+                                        autoFocus
+                                        className="w-full pl-4 pr-10 py-2 bg-transparent border rounded-lg focus:outline-none focus:ring-1 transition-all"
+                                        style={{
+                                            borderColor: 'var(--color-border)',
+                                            color: 'var(--color-text)',
+                                            '--tw-ring-color': 'var(--color-accent)'
+                                        }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute inset-y-0 right-0 pr-3 flex items-center transition-opacity hover:opacity-80"
+                                        style={{ color: 'var(--color-text-muted)' }}
+                                        title={showPassword ? "Hide password" : "Show password"}
+                                    >
+                                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
+                                </div>
                                 {authError && (
                                     <p className="text-xs mt-2 text-red-500 font-medium">{authError}</p>
                                 )}
