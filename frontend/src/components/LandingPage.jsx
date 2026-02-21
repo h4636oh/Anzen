@@ -24,7 +24,7 @@ export default function LandingPage({ onEnterChat, onClearChat, theme, onToggleT
             setPasswordInput('')
             setAuthError('')
         } else if (appPasswordHash === 'SKIP') {
-            onEnterChat()
+            onEnterChat('SKIP')
         } else {
             setAuthMode('enter')
             setPasswordInput('')
@@ -43,11 +43,11 @@ export default function LandingPage({ onEnterChat, onClearChat, theme, onToggleT
             }
             const hash = await hashPassword(passwordInput)
             await onSaveAppPassword(hash)
-            onEnterChat()
+            onEnterChat(passwordInput)
         } else if (authMode === 'enter') {
             const hash = await hashPassword(passwordInput)
             if (hash === appPasswordHash) {
-                onEnterChat()
+                onEnterChat(passwordInput)
             } else {
                 setAuthError('Incorrect password.')
             }
@@ -56,7 +56,7 @@ export default function LandingPage({ onEnterChat, onClearChat, theme, onToggleT
 
     async function handleSkipPassword() {
         await onSaveAppPassword('SKIP')
-        onEnterChat()
+        onEnterChat('SKIP')
     }
 
     return (
@@ -158,6 +158,20 @@ export default function LandingPage({ onEnterChat, onClearChat, theme, onToggleT
                         </div>
 
                         <form onSubmit={handleAuthSubmit} className="flex flex-col gap-4">
+                            {authMode === 'create' && (
+                                <div className="text-xs p-3 rounded-lg border leading-relaxed"
+                                    style={{
+                                        borderColor: 'var(--color-border)',
+                                        background: 'var(--color-bg)',
+                                        color: 'var(--color-text-muted)'
+                                    }}>
+                                    Your password will encrypt your local messages.
+                                    <br />
+                                    <span className="font-semibold" style={{ color: 'var(--color-accent)' }}>
+                                        If skipped, your data is stored in plaintext.
+                                    </span>
+                                </div>
+                            )}
                             <div>
                                 <input
                                     type="password"

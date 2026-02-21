@@ -6,7 +6,7 @@ import ChatWindow from './components/ChatWindow.jsx'
 import ConfirmModal from './components/ConfirmModal.jsx'
 import LockScreen from './components/LockScreen.jsx'
 import { generateUsername, generateAvatarSeed } from './utils/generators.js'
-import { getPrefs, savePrefs, getRooms, saveRoom, deleteRoom, getMessages, getMessagesPage, addMessage, wipeAllData, updateRoomActivity, clearUnread } from './hooks/useIndexedDB.js'
+import { getPrefs, savePrefs, getRooms, saveRoom, deleteRoom, getMessages, getMessagesPage, addMessage, wipeAllData, updateRoomActivity, clearUnread, initEncryption } from './hooks/useIndexedDB.js'
 import { useWebRTC } from './hooks/useWebRTC.js'
 
 const WS_BASE = import.meta.env.VITE_WS_URL || 'ws://localhost:8000'
@@ -66,9 +66,6 @@ export default function App() {
     setTheme(savedTheme)
     setAppPasswordHash(prefs.appPasswordHash || null)
     applyTheme(savedTheme)
-
-    const savedRooms = await getRooms()
-    setRooms(savedRooms)
   }
 
   function applyTheme(t) {
@@ -446,7 +443,10 @@ export default function App() {
     return (
       <>
         <LandingPage
-          onEnterChat={() => {
+          onEnterChat={async (rawPassword) => {
+            await initEncryption(rawPassword)
+            const savedRooms = await getRooms()
+            setRooms(savedRooms)
             lastActivityAt.current = Date.now()
             setView('chat')
           }}
