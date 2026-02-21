@@ -1,12 +1,12 @@
 // ChatWindow.jsx — Main chat area with header, message list, and input
 import { useEffect, useRef, useState } from 'react'
-import { Hash, Users, Lock, AlertCircle, RefreshCw, Loader } from 'lucide-react'
+import { Hash, Users, Lock, AlertCircle, RefreshCw, Loader, Menu } from 'lucide-react'
 import MessageBubble from './MessageBubble.jsx'
 import InputArea from './InputArea.jsx'
 import AboutRoomModal from './AboutRoomModal.jsx'
 import Avatar from './Avatar.jsx'
 
-export default function ChatWindow({ room, messages, peers, localUser, connectionStatus, wsError, onSendText, onSendFile }) {
+export default function ChatWindow({ room, messages, peers, localUser, connectionStatus, wsError, onSendText, onSendFile, onOpenSidebar }) {
     const [showAbout, setShowAbout] = useState(false)
     const bottomRef = useRef(null)
 
@@ -34,7 +34,15 @@ export default function ChatWindow({ room, messages, peers, localUser, connectio
             {/* Header */}
             <div className="flex items-center gap-3 px-4 py-3 border-b border-base"
                 style={{ background: 'var(--color-surface)' }}>
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                {/* Hamburger — mobile only */}
+                <button
+                    onClick={onOpenSidebar}
+                    className="btn-ghost p-2 rounded-md md:hidden flex-shrink-0"
+                    title="Open sidebar"
+                >
+                    <Menu size={18} />
+                </button>
+                <div className="w-8 h-8 rounded-lg flex-shrink-0 items-center justify-center hidden md:flex"
                     style={{ background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)' }}>
                     <Hash size={16} style={{ color: 'var(--color-accent)' }} />
                 </div>

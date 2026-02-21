@@ -18,8 +18,9 @@ export default function App() {
   // ── Navigation ────────────────────────────────────────────────────────────────
   const [view, setView] = useState('landing')  // 'landing' | 'chat'
 
-  // ── Sidebar width (resizable) ─────────────────────────────────────────────────
+  // ── Sidebar width (resizable) & mobile visibility ───────────────────────────
   const [sidebarWidth, setSidebarWidth] = useState(260)
+  const [sidebarOpen, setSidebarOpen] = useState(false) // mobile: sidebar hidden by default
 
   // ── Rooms ─────────────────────────────────────────────────────────────────────
   const [rooms, setRooms] = useState([])
@@ -329,6 +330,8 @@ export default function App() {
         onToggleTheme={toggleTheme}
         width={sidebarWidth}
         onWidthChange={setSidebarWidth}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
       />
       {activeRoom ? (
         <ChatWindow
@@ -340,11 +343,20 @@ export default function App() {
           wsError={wsError}
           onSendText={handleSendText}
           onSendFile={handleSendFile}
+          onOpenSidebar={() => setSidebarOpen(true)}
         />
       ) : (
-        <div className="flex-1 flex items-center justify-center flex-col gap-3"
+        <div className="relative flex-1 flex items-center justify-center flex-col gap-3 px-6"
           style={{ background: 'var(--color-bg)' }}>
-          <p className="text-base" style={{ color: 'var(--color-text-muted)' }}>
+          {/* Hamburger for empty state on mobile */}
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="absolute top-4 left-4 btn-ghost p-2 rounded-md md:hidden"
+            title="Open sidebar"
+          >
+            <span style={{ fontSize: 20 }}>☰</span>
+          </button>
+          <p className="text-base text-center" style={{ color: 'var(--color-text-muted)' }}>
             Select a room from the sidebar or create one to get started.
           </p>
         </div>
