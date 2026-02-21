@@ -138,7 +138,7 @@ export default function Sidebar({
                         </button>
                         <button onClick={() => { setShowJoinPanel(v => !v); setFormError(''); setRoomInput(''); setPassInput('') }}
                             className="btn-ghost p-2 rounded-md" title="Join or create room">
-                            <Plus size={16} style={{ color: showJoinPanel ? 'var(--color-accent)' : undefined }} />
+                            <Plus size={16} className={`transition-transform duration-300 ${showJoinPanel ? 'rotate-45' : ''}`} style={{ color: showJoinPanel ? 'var(--color-accent)' : undefined }} />
                         </button>
                         {/* Close button — mobile only */}
                         <button
@@ -152,17 +152,28 @@ export default function Sidebar({
                 </div>
 
                 {/* Join / Create panel */}
-                {showJoinPanel && (
+                <div
+                    className={`transition-all duration-300 ease-in-out overflow-hidden ${showJoinPanel ? 'max-h-[400px] opacity-100' : 'max-h-0 opacity-0'}`}
+                >
                     <form onSubmit={handleSubmit} className="px-3 py-3 border-b border-base flex flex-col gap-2">
-                        <div className="flex gap-1 surface-2 rounded-md p-0.5">
+                        <div className="relative flex surface-2 rounded-md p-0.5">
+                            {/* Sliding red indicator */}
+                            <div
+                                className="absolute top-0.5 bottom-0.5 rounded shadow-sm transition-all duration-300 ease-out"
+                                style={{
+                                    width: 'calc(50% - 0.125rem)',
+                                    left: isCreating ? 'calc(50% + 0.125rem)' : '0.125rem',
+                                    background: 'var(--color-accent)'
+                                }}
+                            />
                             <button type="button"
                                 onClick={() => setIsCreating(false)}
-                                className={`flex-1 text-sm py-1.5 rounded transition-all font-medium ${!isCreating ? 'btn-primary' : 'btn-ghost'}`}>
+                                className={`flex-1 relative z-10 text-sm py-1.5 rounded transition-all font-medium outline-none ${!isCreating ? 'text-white' : 'opacity-60 hover:opacity-100'}`}>
                                 Join
                             </button>
                             <button type="button"
                                 onClick={() => setIsCreating(true)}
-                                className={`flex-1 text-sm py-1.5 rounded transition-all font-medium ${isCreating ? 'btn-primary' : 'btn-ghost'}`}>
+                                className={`flex-1 relative z-10 text-sm py-1.5 rounded transition-all font-medium outline-none ${isCreating ? 'text-white' : 'opacity-60 hover:opacity-100'}`}>
                                 Create
                             </button>
                         </div>
@@ -195,8 +206,7 @@ export default function Sidebar({
                             {isCreating ? 'Create Room' : 'Join Room'}
                         </button>
                     </form>
-                )
-                }
+                </div>
 
                 {/* Rooms list */}
                 <div className="flex-1 overflow-y-auto px-2 py-2 flex flex-col gap-0.5">
