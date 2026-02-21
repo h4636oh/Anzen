@@ -39,19 +39,36 @@ export async function deleteRoom(roomName) {
 }
 
 // ── Messages ──────────────────────────────────────────────────────────────────
-export async function getMessages(roomName) {
-    const msgs = (await messagesStore.getItem(roomName)) || []
-    // Recreate objectUrls from stored blobs (blob: URLs are session-scoped and die on reload)
+
+/** Recreate session-scoped objectUrls from stored blobs */
+function hydrateBlobs(msgs) {
     return msgs.map(msg => {
         if (msg.blob && (msg.type === 'media' || msg.type === 'file')) {
-            try {
-                return { ...msg, objectUrl: URL.createObjectURL(msg.blob) }
-            } catch {
-                return msg
-            }
+            try { return { ...msg, objectUrl: URL.createObjectURL(msg.blob) } }
+            catch { return msg }
         }
         return msg
     })
+}
+
+export async function getMessages(roomName) {
+    const msgs = (await messagesStore.getItem(roomName)) || []
+    return hydrateBlobs(msgs)
+}
+
+/**
+ * Paginated load — newest-first pagination.
+ * offset=0 → last `limit` messages (newest page)
+ * offset=40 → the 40 before those, etc.
+ * Returns { msgs, total } so callers know when all pages are exhausted.
+ */
+export async function getMessagesPage(roomName, offset = 0, limit = 40) {
+    const all = (await messagesStore.getItem(roomName)) || []
+    const total = all.length
+    const end = total - offset
+    const start = Math.max(0, end - limit)
+    const slice = all.slice(start, end)
+    return { msgs: hydrateBlobs(slice), total }
 }
 
 export async function addMessage(roomName, message) {

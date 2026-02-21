@@ -1,5 +1,5 @@
 // ChatWindow.jsx — Main chat area with header, message list, and input
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useLayoutEffect, useCallback } from 'react'
 import { Hash, Users, Lock, AlertCircle, RefreshCw, Loader, Menu } from 'lucide-react'
 import MessageBubble from './MessageBubble.jsx'
 import DateSeparator from './DateSeparator.jsx'
@@ -7,17 +7,70 @@ import InputArea from './InputArea.jsx'
 import AboutRoomModal from './AboutRoomModal.jsx'
 import Avatar from './Avatar.jsx'
 
-export default function ChatWindow({ room, messages, peers, localUser, connectionStatus, wsError, onSendText, onSendFile, onOpenSidebar }) {
+export default function ChatWindow({ room, messages, peers, localUser, connectionStatus, wsError, onSendText, onSendFile, onOpenSidebar, onLoadMore, allLoaded, loadingMore }) {
     const [showAbout, setShowAbout] = useState(false)
     const bottomRef = useRef(null)
-
-    useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }, [messages])
+    const scrollContainerRef = useRef(null)
+    const topSentinelRef = useRef(null)
+    // Track previous message count to know if messages were prepended (not appended)
+    const prevMsgCountRef = useRef(0)
+    // Snapshot scroll anchor before a prepend so we can restore it
+    const scrollAnchorRef = useRef(null)
 
     const connected = connectionStatus === 'connected'
     const failed = connectionStatus === 'failed'
     const connecting = connectionStatus === 'connecting'
+
+    // ── Scroll to bottom only when a NEW message arrives at the end ──────────────
+    useEffect(() => {
+        const container = scrollContainerRef.current
+        if (!container) return
+        const prevCount = prevMsgCountRef.current
+        const newCount = messages.length
+
+        if (newCount > prevCount) {
+            const diff = newCount - prevCount
+            const wasPrepend = scrollAnchorRef.current !== null
+
+            if (!wasPrepend) {
+                // Message(s) appended (new real-time or initial load) → scroll to bottom
+                bottomRef.current?.scrollIntoView({ behavior: prevCount === 0 ? 'instant' : 'smooth' })
+            }
+            // Prepend case is handled in the layout effect below
+        }
+        prevMsgCountRef.current = newCount
+    }, [messages])
+
+    // ── Restore scroll position after older messages are prepended ───────────────
+    useLayoutEffect(() => {
+        if (scrollAnchorRef.current === null) return
+        const container = scrollContainerRef.current
+        if (!container) return
+        // New scrollHeight minus old scrollHeight = height of newly prepended content
+        const delta = container.scrollHeight - scrollAnchorRef.current
+        container.scrollTop += delta
+        scrollAnchorRef.current = null
+    }, [messages])
+
+    // ── IntersectionObserver on the top sentinel ─────────────────────────────────
+    const handleLoadMore = useCallback(() => {
+        if (allLoaded || loadingMore) return
+        // Snapshot the scroll height RIGHT before the state update so useLayoutEffect can restore
+        const container = scrollContainerRef.current
+        if (container) scrollAnchorRef.current = container.scrollHeight
+        onLoadMore()
+    }, [allLoaded, loadingMore, onLoadMore])
+
+    useEffect(() => {
+        const sentinel = topSentinelRef.current
+        if (!sentinel) return
+        const observer = new IntersectionObserver(
+            ([entry]) => { if (entry.isIntersecting) handleLoadMore() },
+            { root: scrollContainerRef.current, threshold: 0.1 }
+        )
+        observer.observe(sentinel)
+        return () => observer.disconnect()
+    }, [handleLoadMore])
 
     // Status dot color
     const dotColor = connected ? '#22c55e' : connecting ? '#eab308' : '#ef4444'
@@ -101,8 +154,23 @@ export default function ChatWindow({ room, messages, peers, localUser, connectio
             )}
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto">
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
                 <div className="min-h-full flex flex-col justify-end py-2">
+
+                    {/* Top sentinel — triggers load more when scrolled into view */}
+                    <div ref={topSentinelRef} style={{ height: 1 }} />
+
+                    {/* Load more indicator */}
+                    {messages.length > 0 && (
+                        <div className="flex items-center justify-center py-2">
+                            {loadingMore ? (
+                                <Loader size={14} className="animate-spin" style={{ color: 'var(--color-text-muted)' }} />
+                            ) : allLoaded ? (
+                                <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>All messages loaded</span>
+                            ) : null}
+                        </div>
+                    )}
+
                     {messages.length === 0 && (
                         <div className="flex flex-col items-center justify-center flex-1 gap-3 px-4">
                             <div className="w-12 h-12 rounded-xl flex items-center justify-center"
@@ -119,6 +187,7 @@ export default function ChatWindow({ room, messages, peers, localUser, connectio
                             </p>
                         </div>
                     )}
+
                     {messages.map((msg, idx) => {
                         const prev = messages[idx - 1]
                         const next = messages[idx + 1]

@@ -4,7 +4,7 @@ import LandingPage from './components/LandingPage.jsx'
 import Sidebar from './components/Sidebar.jsx'
 import ChatWindow from './components/ChatWindow.jsx'
 import { generateUsername, generateAvatarSeed } from './utils/generators.js'
-import { getPrefs, savePrefs, getRooms, saveRoom, deleteRoom, getMessages, addMessage, wipeAllData } from './hooks/useIndexedDB.js'
+import { getPrefs, savePrefs, getRooms, saveRoom, deleteRoom, getMessages, getMessagesPage, addMessage, wipeAllData } from './hooks/useIndexedDB.js'
 import { useWebRTC } from './hooks/useWebRTC.js'
 
 const WS_BASE = import.meta.env.VITE_WS_URL || 'ws://localhost:8000'
@@ -29,6 +29,9 @@ export default function App() {
   const [peers, setPeers] = useState([])         // [{ id, username, avatarSeed }]
   const [connectionStatus, setConnectionStatus] = useState('idle')
   const [wsError, setWsError] = useState(null)   // last error message from backend
+  const [allLoaded, setAllLoaded] = useState(false)     // true when no older pages remain
+  const [loadingMore, setLoadingMore] = useState(false)  // true while fetching an older page
+  const msgOffsetRef = useRef(0)                         // how many msgs from the end we've loaded
 
   // ── Signaling WebSocket ───────────────────────────────────────────────────────
   const wsRef = useRef(null)
@@ -220,9 +223,7 @@ export default function App() {
     setRooms(updatedRooms)
     setActiveRoom(roomName)
 
-    const roomMsgs = await getMessages(roomName)
-    setMessages(roomMsgs)
-
+    await loadInitialMessages(roomName)
     openSignalingWs(roomName, password)
   }
 
@@ -230,9 +231,37 @@ export default function App() {
     const room = rooms.find(r => r.roomName === roomName)
     if (!room) return
     setActiveRoom(roomName)
-    const roomMsgs = await getMessages(roomName)
-    setMessages(roomMsgs)
+    await loadInitialMessages(roomName)
     openSignalingWs(roomName, room.password)
+  }
+
+  const PAGE_SIZE = 40
+
+  async function loadInitialMessages(roomName) {
+    msgOffsetRef.current = 0
+    setAllLoaded(false)
+    const { msgs, total } = await getMessagesPage(roomName, 0, PAGE_SIZE)
+    msgOffsetRef.current = msgs.length
+    setMessages(msgs)
+    setAllLoaded(msgs.length >= total)
+  }
+
+  async function handleLoadMore(roomName) {
+    if (loadingMore || allLoaded || !roomName) return
+    setLoadingMore(true)
+    try {
+      const currentOffset = msgOffsetRef.current
+      const { msgs, total } = await getMessagesPage(roomName, currentOffset, PAGE_SIZE)
+      if (msgs.length === 0) {
+        setAllLoaded(true)
+        return
+      }
+      msgOffsetRef.current = currentOffset + msgs.length
+      setMessages(prev => [...msgs, ...prev])
+      setAllLoaded(msgOffsetRef.current >= total)
+    } finally {
+      setLoadingMore(false)
+    }
   }
 
   async function handleLeaveRoom(roomName) {
@@ -245,6 +274,8 @@ export default function App() {
       setActiveRoom(null)
       setMessages([])
       setConnectionStatus('idle')
+      setAllLoaded(false)
+      msgOffsetRef.current = 0
     }
   }
 
@@ -344,6 +375,9 @@ export default function App() {
           onSendText={handleSendText}
           onSendFile={handleSendFile}
           onOpenSidebar={() => setSidebarOpen(true)}
+          onLoadMore={() => handleLoadMore(activeRoom)}
+          allLoaded={allLoaded}
+          loadingMore={loadingMore}
         />
       ) : (
         <div className="relative flex-1 flex items-center justify-center flex-col gap-3 px-6"
