@@ -8,18 +8,20 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./anzen.db")
 
+# Auto-convert asyncpg to psycopg so the environment variable doesn't need to change
+if DATABASE_URL.startswith("postgresql+asyncpg://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql+psycopg://")
+
 # aiosqlite does not use check_same_thread (it runs in a background thread internally).
 # Only pass it for synchronous sqlite3 dialects.
 _connect_args = {}
 if "sqlite" in DATABASE_URL and "aiosqlite" not in DATABASE_URL:
     _connect_args = {"check_same_thread": False}
 elif "postgres" in DATABASE_URL:
-    # Required for Supabase transaction pooler (port 6543) with asyncpg
-    # SSL is also explicitly required to prevent connection hangs
+    # psycopg uses different connect args than asyncpg
+    # However, psycopg automatically handles prepared statements safely with pgbouncer/supavisor
     _connect_args = {
-        "statement_cache_size": 0,
-        "prepared_statement_cache_size": 0,
-        "ssl": True,
+        "sslmode": "require",
     }
 
 engine = create_async_engine(

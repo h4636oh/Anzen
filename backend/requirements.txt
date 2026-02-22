@@ -1,7 +1,7 @@
 fastapi
 uvicorn[standard]
 sqlalchemy[asyncio]
-asyncpg
+psycopg[binary]
 aiosqlite
 python-dotenv
 passlib[bcrypt]
