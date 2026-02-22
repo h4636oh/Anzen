@@ -389,9 +389,9 @@ export default function App() {
     await notifyRoomActivity(activeRoom)
   }
 
-  async function handleSendFile(file) {
+  async function handleSendFile(file, caption = '') {
     if (!user || !activeRoom) return
-    roomActionsRef.current[activeRoom]?.broadcastFile(file)
+    roomActionsRef.current[activeRoom]?.broadcastFile(file, caption)
 
     const blob = file
     const objectUrl = URL.createObjectURL(file)
@@ -406,6 +406,7 @@ export default function App() {
       mimeType: file.type,
       objectUrl,
       blob,
+      caption: caption,
     }
     setMessagesByRoom(prev => ({ ...prev, [activeRoom]: [...(prev[activeRoom] || []), msg] }))
     await addMessage(activeRoom, msg)

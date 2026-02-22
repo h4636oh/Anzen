@@ -43,27 +43,51 @@ export default function MessageBubble({ msg, isOwn, showHeader, showTime }) {
                 )}
 
                 {(msg.type === 'media') && (
-                    <div className="max-w-xs lg:max-w-md">
+                    <div className="max-w-xs lg:max-w-md flex flex-col rounded-xl overflow-hidden border border-base"
+                        style={{
+                            background: isOwn ? 'var(--color-accent)' : 'var(--color-surface-2)',
+                        }}>
                         {msg.mimeType?.startsWith('image/') && (
                             <img src={msg.objectUrl} alt={msg.fileName}
-                                className="rounded-xl max-w-full border border-base"
-                                style={{ maxHeight: 280, objectFit: 'cover' }} />
+                                className="w-full object-cover"
+                                style={{ maxHeight: 280, display: 'block' }} />
                         )}
                         {msg.mimeType?.startsWith('video/') && (
                             <video src={msg.objectUrl} controls
-                                className="rounded-xl max-w-full border border-base"
-                                style={{ maxHeight: 280 }} />
+                                className="w-full object-cover"
+                                style={{ maxHeight: 280, display: 'block' }} />
+                        )}
+                        {msg.caption && (
+                            <div className="px-3 py-2 text-sm leading-relaxed break-words"
+                                style={{ color: isOwn ? 'white' : 'var(--color-text)' }}>
+                                {msg.caption}
+                            </div>
                         )}
                     </div>
                 )}
 
                 {msg.type === 'file' && (
-                    <a href={msg.objectUrl} download={msg.fileName}
-                        className="flex items-center gap-2 px-3 py-2 rounded-xl border border-base surface text-sm hover:opacity-80 transition-opacity">
-                        <FileText size={16} style={{ color: 'var(--color-accent)' }} />
-                        <span className="truncate max-w-xs" style={{ color: 'var(--color-text)' }}>{msg.fileName}</span>
-                        <Download size={14} style={{ color: 'var(--color-text-muted)' }} />
-                    </a>
+                    <div className="max-w-xs lg:max-w-md flex flex-col rounded-xl overflow-hidden border border-base"
+                        style={{
+                            background: isOwn ? 'var(--color-accent)' : 'var(--color-surface-2)',
+                        }}>
+                        <a href={msg.objectUrl} download={msg.fileName}
+                            className="flex items-center gap-2 px-3 py-2 text-sm hover:opacity-80 transition-opacity"
+                            style={{
+                                color: isOwn ? 'white' : 'var(--color-text)',
+                                background: 'rgba(0,0,0,0.1)'
+                            }}>
+                            <FileText size={16} />
+                            <span className="truncate flex-1 min-w-0 max-w-xs">{msg.fileName}</span>
+                            <Download size={14} flexShrink={0} />
+                        </a>
+                        {msg.caption && (
+                            <div className="px-3 py-2 text-sm leading-relaxed break-words border-t border-base"
+                                style={{ color: isOwn ? 'white' : 'var(--color-text)' }}>
+                                {msg.caption}
+                            </div>
+                        )}
+                    </div>
                 )}
 
                 {showTime && (

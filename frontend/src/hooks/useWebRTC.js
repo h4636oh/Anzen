@@ -75,6 +75,7 @@ export function useWebRTC({ signalingWsRef, localPeerId, localUser, onMessage, o
                             mimeType: entry.meta.mimeType,
                             objectUrl,
                             blob,
+                            caption: entry.meta.caption || '',
                         })
                     }
                     return
@@ -215,11 +216,12 @@ export function useWebRTC({ signalingWsRef, localPeerId, localUser, onMessage, o
     }, []) // stable — uses refs
 
     // ── Send a file to all open data channels ─────────────────────────────────────
-    const broadcastFile = useCallback((file) => {
+    const broadcastFile = useCallback((file, caption = '') => {
         const senderMeta = {
             senderId: localPeerIdRef.current,
             senderName: localUserRef.current?.username,
             avatarSeed: localUserRef.current?.avatarSeed,
+            caption: caption,
         }
         for (const [, channel] of dataChannels.current) {
             if (channel.readyState === 'open') sendFile(channel, file, senderMeta)

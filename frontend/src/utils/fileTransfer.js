@@ -22,6 +22,7 @@ export async function sendFile(channel, file, senderMeta = {}) {
         senderId: senderMeta.senderId || '',
         senderName: senderMeta.senderName || 'Peer',
         avatarSeed: senderMeta.avatarSeed || '',
+        caption: senderMeta.caption || '',
     }))
 
     // Send binary chunks
