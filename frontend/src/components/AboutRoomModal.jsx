@@ -1,9 +1,22 @@
-// AboutRoomModal.jsx — Overlay showing room info and connected peers
-import { X, Hash, Users, Clock, Shield } from 'lucide-react'
+import { useState } from 'react'
+import { X, Hash, Users, Clock, Shield, Share2, Check } from 'lucide-react'
 import Avatar from './Avatar.jsx'
 
 export default function AboutRoomModal({ room, peers, onClose }) {
+    const [justShared, setJustShared] = useState(false)
+
     if (!room) return null
+
+    function handleShare() {
+        if (!room) return
+        const url = `${window.location.origin}/#room=${encodeURIComponent(room.roomName)}&pwd=${encodeURIComponent(room.password || '')}`
+        navigator.clipboard.writeText(url).then(() => {
+            setJustShared(true)
+            setTimeout(() => setJustShared(false), 2000)
+        }).catch(err => {
+            console.error('Failed to copy link: ', err)
+        })
+    }
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -13,9 +26,14 @@ export default function AboutRoomModal({ room, peers, onClose }) {
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-base">
                     <h2 className="font-semibold text-sm" style={{ color: 'var(--color-text)' }}>About Room</h2>
-                    <button onClick={onClose} className="btn-ghost p-1 rounded-md">
-                        <X size={16} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                        <button onClick={handleShare} className="btn-ghost p-1 rounded-md transition-colors" title="Share room link" style={{ color: justShared ? '#22c55e' : undefined }}>
+                            {justShared ? <Check size={16} /> : <Share2 size={16} />}
+                        </button>
+                        <button onClick={onClose} className="btn-ghost p-1 rounded-md">
+                            <X size={16} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Room info */}

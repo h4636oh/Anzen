@@ -62,6 +62,35 @@ export default function App() {
     loadIdentity()
   }, [])
 
+  // ── Auto-join from URL hash (Share Link) ──────────────────────────────────────
+  useEffect(() => {
+    if (view === 'chat' && window.location.hash) {
+      // Parse hash like #room=abc&pwd=123
+      const hashParams = new URLSearchParams(window.location.hash.slice(1))
+      const inviteRoom = hashParams.get('room')
+      const invitePwd = hashParams.get('pwd')
+
+      if (inviteRoom && invitePwd) {
+        // Clear the hash so we don't keep re-joining on refresh
+        window.history.replaceState(null, '', window.location.pathname + window.location.search)
+
+        if (activeRoom === inviteRoom) {
+          // Already in this room and it's active
+          return
+        }
+
+        const existingRoom = rooms.find(r => r.roomName === inviteRoom)
+        if (existingRoom) {
+          // We have the room, just select it
+          handleSelectRoom(inviteRoom)
+        } else {
+          // New room to join
+          handleJoinRoom(inviteRoom, invitePwd, false)
+        }
+      }
+    }
+  }, [view, activeRoom, rooms])
+
   async function loadIdentity() {
     const prefs = await getPrefs()
     const username = prefs.username || generateUsername()
