@@ -1,0 +1,6 @@
+__pycache__/
+venv/
+.env
+.env.example
+backend/.env
+backend/anzen.db
