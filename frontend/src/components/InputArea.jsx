@@ -1,13 +1,26 @@
 // InputArea.jsx — Text input with emoji, file attachment, camera, and send
-import { useRef, useState } from 'react'
-import { Paperclip, Send, X, Camera } from 'lucide-react'
+import { useRef, useState, useEffect } from 'react'
+import { Paperclip, Send, X, Camera, Smile } from 'lucide-react'
 import CameraCapture from './CameraCapture.jsx'
+import EmojiPicker from 'emoji-picker-react'
 
-export default function InputArea({ onSendText, onSendFile, disabled }) {
+export default function InputArea({ onSendText, onSendFile, disabled, theme }) {
     const [text, setText] = useState('')
     const [pendingFile, setPendingFile] = useState(null)
     const [showCamera, setShowCamera] = useState(false)
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false)
     const fileRef = useRef()
+    const containerRef = useRef()
+
+    useEffect(() => {
+        function handleClickOutside(e) {
+            if (containerRef.current && !containerRef.current.contains(e.target)) {
+                setShowEmojiPicker(false)
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [])
 
     function handleSubmit(e) {
         e.preventDefault()
@@ -60,6 +73,31 @@ export default function InputArea({ onSendText, onSendFile, disabled }) {
                     </button>
                 </div>
             )}
+
+            {/* Emoji */}
+            <div className="relative flex-shrink-0 self-stretch aspect-square" ref={containerRef}>
+                <button type="button"
+                    className="btn-ghost w-full h-full !p-0 rounded-lg border border-base flex items-center justify-center transition-colors"
+                    disabled={disabled}
+                    onClick={() => setShowEmojiPicker(prev => !prev)}
+                    title="Add emoji">
+                    <Smile size={16} />
+                </button>
+
+                {showEmojiPicker && (
+                    <div className="absolute bottom-full left-0 mb-4 z-50 shadow-2xl rounded-lg">
+                        <EmojiPicker
+                            onEmojiClick={(emojiData) => {
+                                setText(prev => prev + emojiData.emoji)
+                            }}
+                            theme={theme === 'dark' ? 'dark' : 'light'}
+                            searchPosition="none"
+                            skinTonesDisabled
+                            lazyLoadEmojis
+                        />
+                    </div>
+                )}
+            </div>
 
             {/* Left area: always flex-1 so buttons stay pinned to the right */}
             <div className="flex-1 flex items-center min-w-0">

@@ -7,7 +7,7 @@ import InputArea from './InputArea.jsx'
 import AboutRoomModal from './AboutRoomModal.jsx'
 import Avatar from './Avatar.jsx'
 
-export default function ChatWindow({ room, messages, peers, localUser, connectionStatus, wsError, onSendText, onSendFile, onOpenSidebar, onLeaveRoom, onLoadMore, allLoaded, loadingMore }) {
+export default function ChatWindow({ room, messages, peers, localUser, connectionStatus, wsError, onSendText, onSendFile, onOpenSidebar, onLeaveRoom, onLoadMore, allLoaded, loadingMore, theme }) {
     const [showAbout, setShowAbout] = useState(false)
     const bottomRef = useRef(null)
     const scrollContainerRef = useRef(null)
@@ -219,6 +219,7 @@ export default function ChatWindow({ room, messages, peers, localUser, connectio
                 onSendText={onSendText}
                 onSendFile={onSendFile}
                 disabled={!connected}
+                theme={theme}
             />
 
             {showAbout && (

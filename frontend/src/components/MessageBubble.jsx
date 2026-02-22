@@ -31,8 +31,7 @@ export default function MessageBubble({ msg, isOwn, showHeader, showTime }) {
 
                 {msg.type === 'text' && (
                     <div style={{ maxWidth: 'min(90%, 24rem)' }}>
-                        <div className={`px-3 py-2 rounded-xl text-sm leading-relaxed break-words overflow-hidden ${isOwn ? 'rounded-tr-sm' : 'rounded-tl-sm'
-                            }`}
+                        <div className={`px-3 py-2 rounded-xl text-sm leading-relaxed break-words overflow-hidden`}
                             style={{
                                 background: isOwn ? 'var(--color-accent)' : 'var(--color-surface-2)',
                                 color: isOwn ? 'white' : 'var(--color-text)',

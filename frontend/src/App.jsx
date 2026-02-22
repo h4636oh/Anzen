@@ -529,6 +529,7 @@ export default function App() {
           onLoadMore={() => handleLoadMore(activeRoom)}
           allLoaded={!!allLoadedByRoom[activeRoom]}
           loadingMore={!!loadingMoreByRoom[activeRoom]}
+          theme={theme}
         />
       ) : (
         <div className="relative flex-1 flex items-center justify-center flex-col gap-3 px-6"
