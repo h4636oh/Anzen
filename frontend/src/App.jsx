@@ -33,6 +33,10 @@ export default function App() {
   const [rooms, setRooms] = useState([])
   const [activeRoom, setActiveRoom] = useState(null)
   const [roomToLeave, setRoomToLeave] = useState(null)
+  const [roomToDisconnect, setRoomToDisconnect] = useState(null)
+
+  // Rooms that the user purposely dropped the connection for without deleting
+  const [disconnectedRooms, setDisconnectedRooms] = useState(new Set())
 
   // Room data mapped by roomName
   const [messagesByRoom, setMessagesByRoom] = useState({})
@@ -260,6 +264,13 @@ export default function App() {
     if (!messagesByRoom[roomName]) {
       await loadInitialMessages(roomName)
     }
+
+    setDisconnectedRooms(prev => {
+      if (!prev.has(roomName)) return prev
+      const next = new Set(prev)
+      next.delete(roomName)
+      return next
+    })
   }
 
   async function handleJoinRoom(roomName, password, isCreating) {
@@ -302,10 +313,40 @@ export default function App() {
     if (!messagesByRoom[roomName]) {
       await loadInitialMessages(roomName)
     }
+
+    setDisconnectedRooms(prev => {
+      if (!prev.has(roomName)) return prev
+      const next = new Set(prev)
+      next.delete(roomName)
+      return next
+    })
   }
 
   function handleLeaveRoom(roomName) {
     setRoomToLeave(roomName)
+  }
+
+  function handleDisconnectRoom(roomName) {
+    setRoomToDisconnect(roomName)
+  }
+
+  function confirmDisconnectRoom() {
+    if (!roomToDisconnect) return
+    const roomName = roomToDisconnect
+    setRoomToDisconnect(null)
+
+    setDisconnectedRooms(prev => {
+      const next = new Set(prev)
+      next.add(roomName)
+      return next
+    })
+
+    if (activeRoom === roomName) {
+      setActiveRoom(null)
+    }
+
+    setStatusByRoom(prev => { const n = { ...prev }; delete n[roomName]; return n })
+    setErrorByRoom(prev => { const n = { ...prev }; delete n[roomName]; return n })
   }
 
   async function confirmLeaveRoom() {
@@ -400,6 +441,7 @@ export default function App() {
             await initEncryption(rawPassword)
             const savedRooms = await getRooms()
             setRooms(savedRooms)
+            setDisconnectedRooms(new Set(savedRooms.map(r => r.roomName)))
             lastActivityAt.current = Date.now()
             for (const r of savedRooms) {
               await loadInitialMessages(r.roomName)
@@ -440,7 +482,7 @@ export default function App() {
       )}
 
       {/* Render headless RoomConnections for all saved rooms */}
-      {rooms.map(r => (
+      {rooms.filter(r => !disconnectedRooms.has(r.roomName)).map(r => (
         <RoomConnection
           key={r.roomName}
           roomName={r.roomName}
@@ -461,6 +503,8 @@ export default function App() {
         onSelectRoom={handleSelectRoom}
         onJoinRoom={handleJoinRoom}
         onLeaveRoom={handleLeaveRoom}
+        onDisconnectRoom={handleDisconnectRoom}
+        statusByRoom={statusByRoom}
         onGoToLanding={() => setView('landing')}
         theme={theme}
         onToggleTheme={toggleTheme}
@@ -480,6 +524,7 @@ export default function App() {
           onSendText={handleSendText}
           onSendFile={handleSendFile}
           onOpenSidebar={() => setSidebarOpen(true)}
+          onLeaveRoom={handleLeaveRoom}
           onLoadMore={() => handleLoadMore(activeRoom)}
           allLoaded={!!allLoadedByRoom[activeRoom]}
           loadingMore={!!loadingMoreByRoom[activeRoom]}
@@ -505,11 +550,23 @@ export default function App() {
       {roomToLeave && (
         <ConfirmModal
           title="Leave Room"
-          message={`Are you sure you want to leave the room "${roomToLeave}"?`}
-          confirmText="Leave"
+          message={`Are you sure you want to leave the room "${roomToLeave}"? All chats and history for this room will be permanently deleted from your device.`}
+          confirmText="Leave and Delete"
           onConfirm={confirmLeaveRoom}
           onCancel={() => setRoomToLeave(null)}
           isDestructive={true}
+        />
+      )}
+
+      {/* Disconnect Room Confirmation Modal */}
+      {roomToDisconnect && (
+        <ConfirmModal
+          title="Disconnect Room"
+          message={`Do you want to disconnect from this room? You can reconnect later by clicking it in the sidebar.`}
+          confirmText="Disconnect"
+          onConfirm={confirmDisconnectRoom}
+          onCancel={() => setRoomToDisconnect(null)}
+          isDestructive={false}
         />
       )}
 

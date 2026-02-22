@@ -1,13 +1,13 @@
 // ChatWindow.jsx — Main chat area with header, message list, and input
 import { useEffect, useRef, useState, useLayoutEffect, useCallback } from 'react'
-import { Hash, Users, Lock, AlertCircle, RefreshCw, Loader, Menu } from 'lucide-react'
+import { Hash, Users, Lock, LogOut, AlertCircle, RefreshCw, Loader, Menu } from 'lucide-react'
 import MessageBubble from './MessageBubble.jsx'
 import DateSeparator from './DateSeparator.jsx'
 import InputArea from './InputArea.jsx'
 import AboutRoomModal from './AboutRoomModal.jsx'
 import Avatar from './Avatar.jsx'
 
-export default function ChatWindow({ room, messages, peers, localUser, connectionStatus, wsError, onSendText, onSendFile, onOpenSidebar, onLoadMore, allLoaded, loadingMore }) {
+export default function ChatWindow({ room, messages, peers, localUser, connectionStatus, wsError, onSendText, onSendFile, onOpenSidebar, onLeaveRoom, onLoadMore, allLoaded, loadingMore }) {
     const [showAbout, setShowAbout] = useState(false)
     const bottomRef = useRef(null)
     const scrollContainerRef = useRef(null)
@@ -126,12 +126,16 @@ export default function ChatWindow({ room, messages, peers, localUser, connectio
                     )}
                 </div>
 
+                <button onClick={() => onLeaveRoom(room?.roomName)}
+                    className="btn-ghost p-2 rounded-md hover:text-red-500 transition-colors"
+                    title="Leave room">
+                    <LogOut size={15} />
+                </button>
                 <button onClick={() => setShowAbout(true)}
                     className="btn-ghost p-2 rounded-md"
                     title="About this room">
                     <Users size={15} />
                 </button>
-                <Lock size={13} style={{ color: 'var(--color-accent)' }} title="E2E encrypted" />
             </div>
 
             {/* Error banner */}
