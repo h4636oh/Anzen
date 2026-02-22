@@ -7,6 +7,7 @@ export default function RoomConnection({
     roomName,
     password,
     user,
+    isActive,
     onMessage,
     onPeersUpdate,
     onConnectionStatusChange,
@@ -15,6 +16,7 @@ export default function RoomConnection({
 }) {
     const wsRef = useRef(null)
     const peerMetaRef = useRef(new Map())
+    const isActiveRef = useRef(isActive)
 
     const handleIncomingMessage = useCallback((msg) => {
         onMessage(roomName, msg)
@@ -40,6 +42,8 @@ export default function RoomConnection({
         broadcastText,
         broadcastFile,
         disconnectAll,
+        disconnectPeer,
+        hasConnection,
         getPeerIds
     } = useWebRTC({
         signalingWsRef: wsRef,
@@ -58,6 +62,27 @@ export default function RoomConnection({
             if (unregisterActions) unregisterActions(roomName)
         }
     }, [roomName, registerActions, unregisterActions, broadcastText, broadcastFile, disconnectAll, getPeerIds])
+
+    useEffect(() => {
+        isActiveRef.current = isActive
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({ type: 'status', isActive }))
+        }
+
+        if (isActive) {
+            for (const [peerId, meta] of peerMetaRef.current.entries()) {
+                if (!hasConnection(peerId)) {
+                    initiateCall(peerId)
+                }
+            }
+        } else {
+            for (const [peerId, meta] of peerMetaRef.current.entries()) {
+                if (!meta.isActive) {
+                    disconnectPeer(peerId)
+                }
+            }
+        }
+    }, [isActive, initiateCall, disconnectPeer, hasConnection])
 
     useEffect(() => {
         if (!user || !roomName) return
@@ -84,6 +109,7 @@ export default function RoomConnection({
                 peerId: user.peerId,
                 username: user.username,
                 avatarSeed: user.avatarSeed,
+                isActive: isActiveRef.current,
             }))
         }
 
@@ -95,13 +121,25 @@ export default function RoomConnection({
                 case 'joined': {
                     onConnectionStatusChange(roomName, 'connected', null)
                     for (const peer of (msg.peers || [])) {
-                        peerMetaRef.current.set(peer.peerId, { username: peer.username, avatarSeed: peer.avatarSeed })
-                        await initiateCall(peer.peerId)
+                        peerMetaRef.current.set(peer.peerId, { username: peer.username, avatarSeed: peer.avatarSeed, isActive: peer.isActive })
+                        if (isActiveRef.current || peer.isActive) {
+                            await initiateCall(peer.peerId)
+                        }
                     }
                     break
                 }
                 case 'peer-joined': {
-                    peerMetaRef.current.set(msg.peerId, { username: msg.username, avatarSeed: msg.avatarSeed })
+                    peerMetaRef.current.set(msg.peerId, { username: msg.username, avatarSeed: msg.avatarSeed, isActive: msg.isActive })
+                    break
+                }
+                case 'peer-status': {
+                    const meta = peerMetaRef.current.get(msg.peerId)
+                    if (meta) {
+                        meta.isActive = msg.isActive
+                        if (!msg.isActive && !isActiveRef.current) {
+                            disconnectPeer(msg.peerId)
+                        }
+                    }
                     break
                 }
                 case 'offer': {

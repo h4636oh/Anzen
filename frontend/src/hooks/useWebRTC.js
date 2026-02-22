@@ -233,6 +233,10 @@ export function useWebRTC({ signalingWsRef, localPeerId, localUser, onMessage, o
         for (const peerId of [...peerConnections.current.keys()]) cleanupPeer(peerId)
     }, [cleanupPeer])
 
+    // ── Getters ───────────────────────────────────────────────────────────────────
+    const hasConnection = useCallback((peerId) => peerConnections.current.has(peerId), [])
+    const getPeerIds = useCallback(() => [...peerConnections.current.keys()], [])
+
     return {
         initiateCall,
         handleOffer,
@@ -241,6 +245,8 @@ export function useWebRTC({ signalingWsRef, localPeerId, localUser, onMessage, o
         broadcastText,
         broadcastFile,
         disconnectAll,
-        getPeerIds: () => [...peerConnections.current.keys()],
+        disconnectPeer: cleanupPeer,
+        hasConnection,
+        getPeerIds,
     }
 }

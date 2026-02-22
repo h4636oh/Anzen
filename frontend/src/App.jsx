@@ -489,6 +489,7 @@ export default function App() {
           roomName={r.roomName}
           password={r.password}
           user={user}
+          isActive={activeRoom === r.roomName}
           onMessage={handleIncomingMessage}
           onPeersUpdate={handlePeersUpdate}
           onConnectionStatusChange={handleConnectionStatusChange}

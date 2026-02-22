@@ -141,7 +141,7 @@ async def websocket_signaling(room_name: str, ws: WebSocket, db: AsyncSession = 
         return
 
     existing_peers = [
-        {"peerId": pid, "username": data["username"], "avatarSeed": data["avatarSeed"]}
+        {"peerId": pid, "username": data["username"], "avatarSeed": data["avatarSeed"], "isActive": data["isActive"]}
         for pid, data in rooms_registry[room_name].items()
     ]
 
@@ -149,6 +149,7 @@ async def websocket_signaling(room_name: str, ws: WebSocket, db: AsyncSession = 
         "ws": ws,
         "username": username,
         "avatarSeed": avatar_seed,
+        "isActive": join_msg.get("isActive", True),
     }
 
     # Step 4: Tell this peer about everyone already in the room
@@ -160,6 +161,7 @@ async def websocket_signaling(room_name: str, ws: WebSocket, db: AsyncSession = 
         "peerId": peer_id,
         "username": username,
         "avatarSeed": avatar_seed,
+        "isActive": join_msg.get("isActive", True),
     })
 
     logger.info(f"Peer {peer_id[:8]} joined room '{room_name}' (now {len(rooms_registry[room_name])} peers)")
@@ -176,12 +178,21 @@ async def websocket_signaling(room_name: str, ws: WebSocket, db: AsyncSession = 
             msg_type = msg.get("type")
             target_id = msg.get("to")
 
-            # We only route these three message types — we never inspect their content
+            # We route offer/answer/ice-candidate
             if msg_type in ("offer", "answer", "ice-candidate") and target_id:
                 msg["from"] = peer_id
                 msg["username"] = username
                 msg["avatarSeed"] = avatar_seed
                 await _send_to_peer(room_name, target_id, msg)
+                
+            elif msg_type == "status" and "isActive" in msg:
+                if peer_id in rooms_registry.get(room_name, {}):
+                    rooms_registry[room_name][peer_id]["isActive"] = msg["isActive"]
+                    await _broadcast_to_room_except(room_name, peer_id, {
+                        "type": "peer-status",
+                        "peerId": peer_id,
+                        "isActive": msg["isActive"]
+                    })
 
     except WebSocketDisconnect:
         pass
