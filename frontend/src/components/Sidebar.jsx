@@ -1,6 +1,6 @@
 // Sidebar.jsx — Left navigation: rooms list + user profile (with drag-to-resize & mobile overlay)
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Plus, Hash, Shield, LogOut, Trash2, Sun, Moon, X, Eye, EyeOff, Link } from 'lucide-react'
+import { Plus, Hash, Shield, LogOut, Trash2, Sun, Moon, X, Eye, EyeOff, Link, Unlink } from 'lucide-react'
 import { generateRoomName } from '../utils/generators.js'
 import Avatar from './Avatar.jsx'
 
@@ -261,9 +261,10 @@ export default function Sidebar({
                                 )}
                                 {isConnected && (
                                     <button onClick={(e) => { e.stopPropagation(); onDisconnectRoom(room.roomName) }}
-                                        className="p-0.5 transition-opacity hover:opacity-80"
+                                        className="p-0.5 group/btn relative flex items-center justify-center w-4 h-4"
                                         title="Disconnect from room">
-                                        <Link size={13} style={{ color: '#86efac' }} />
+                                        <Link size={13} className="text-[#86efac] opacity-100 group-hover/btn:opacity-0 transition-opacity absolute" />
+                                        <Unlink size={13} className="text-red-500 opacity-0 group-hover/btn:opacity-100 transition-opacity absolute" />
                                     </button>
                                 )}
                             </div>
