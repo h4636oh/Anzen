@@ -9,7 +9,7 @@ import { Download, FileText } from 'lucide-react'
  *   isOwn       — boolean, true if sent by local user
  *   showHeader  — boolean, show avatar + name (false if same sender as previous)
  */
-export default function MessageBubble({ msg, isOwn, showHeader, showTime }) {
+export default function MessageBubble({ msg, isOwn, showHeader, showTime, onMediaLoad }) {
     const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
     return (
@@ -48,11 +48,13 @@ export default function MessageBubble({ msg, isOwn, showHeader, showTime }) {
                         }}>
                         {msg.mimeType?.startsWith('image/') && (
                             <img src={msg.objectUrl} alt={msg.fileName}
+                                onLoad={onMediaLoad}
                                 className="w-full object-cover"
                                 style={{ maxHeight: 280, display: 'block' }} />
                         )}
                         {msg.mimeType?.startsWith('video/') && (
                             <video src={msg.objectUrl} controls
+                                onLoadedData={onMediaLoad}
                                 className="w-full object-cover"
                                 style={{ maxHeight: 280, display: 'block' }} />
                         )}

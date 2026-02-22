@@ -16,6 +16,7 @@ export default function ChatWindow({ room, messages, peers, localUser, connectio
     const prevMsgCountRef = useRef(0)
     // Snapshot scroll anchor before a prepend so we can restore it
     const scrollAnchorRef = useRef(null)
+    const isAtBottomRef = useRef(true)
 
     const connected = connectionStatus === 'connected'
     const failed = connectionStatus === 'failed'
@@ -34,12 +35,20 @@ export default function ChatWindow({ room, messages, peers, localUser, connectio
 
             if (!wasPrepend) {
                 // Message(s) appended (new real-time or initial load) → scroll to bottom
+                isAtBottomRef.current = true
                 bottomRef.current?.scrollIntoView({ behavior: prevCount === 0 ? 'instant' : 'smooth' })
             }
             // Prepend case is handled in the layout effect below
         }
         prevMsgCountRef.current = newCount
     }, [messages])
+
+    // ── Track if user intentionally scrolled up ──────────────────────────────────
+    const handleScroll = useCallback(() => {
+        const container = scrollContainerRef.current
+        if (!container) return
+        isAtBottomRef.current = container.scrollHeight - container.scrollTop - container.clientHeight < 100
+    }, [])
 
     // ── Restore scroll position after older messages are prepended ───────────────
     useLayoutEffect(() => {
@@ -51,6 +60,15 @@ export default function ChatWindow({ room, messages, peers, localUser, connectio
         container.scrollTop += delta
         scrollAnchorRef.current = null
     }, [messages])
+
+    // ── Handle media load to keep scroll at bottom ───────────────────────────────
+    const handleMediaLoad = useCallback(() => {
+        // If we were at the bottom before the media expanded, stay at the bottom.
+        // We use 'instant' so multiple rapid media loads don't confuse the scroll position or cause jittery smooth scrolls.
+        if (isAtBottomRef.current) {
+            bottomRef.current?.scrollIntoView({ behavior: 'instant' })
+        }
+    }, [])
 
     // ── IntersectionObserver on the top sentinel ─────────────────────────────────
     const handleLoadMore = useCallback(() => {
@@ -158,7 +176,7 @@ export default function ChatWindow({ room, messages, peers, localUser, connectio
             )}
 
             {/* Messages */}
-            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto" onScroll={handleScroll}>
                 <div className="min-h-full flex flex-col justify-end py-2">
 
                     {/* Top sentinel — triggers load more when scrolled into view */}
@@ -206,7 +224,7 @@ export default function ChatWindow({ room, messages, peers, localUser, connectio
                         return (
                             <>
                                 {showDate && <DateSeparator key={`date-${msg.id}`} date={msg.timestamp} />}
-                                <MessageBubble key={msg.id} msg={msg} isOwn={isOwn} showHeader={showHeader} showTime={showTime} />
+                                <MessageBubble key={msg.id} msg={msg} isOwn={isOwn} showHeader={showHeader} showTime={showTime} onMediaLoad={handleMediaLoad} />
                             </>
                         )
                     })}
