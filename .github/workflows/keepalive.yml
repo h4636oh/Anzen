@@ -1,0 +1,14 @@
+name: Keep Render Alive
+
+on:
+  schedule:
+    - cron: '*/5 * * * *' # Runs every 5 minutes
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render Backend
+        # REPLACE the URL below with your actual deployed Render backend URL once it is created
+        run: curl -sSf https://anzen-backend.onrender.com/ping > /dev/null
