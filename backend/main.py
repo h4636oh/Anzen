@@ -65,11 +65,6 @@ rooms_registry: dict[str, dict[str, dict[str, Any]]] = {}
 
 
 # ── REST endpoints ─────────────────────────────────────────────────────────────
-@app.get("/ping")
-async def ping():
-    return {"status": "ok"}
-
-
 @app.post("/rooms", status_code=201)
 async def create_room(body: RoomCreate, db: AsyncSession = Depends(get_db)):
     """Create a room. Idempotent — if it already exists with the same password, returns 200."""

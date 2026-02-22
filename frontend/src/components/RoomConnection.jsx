@@ -1,8 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { useWebRTC } from '../hooks/useWebRTC'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-const WS_BASE = import.meta.env.VITE_WS_URL || API_URL.replace(/^http/, 'ws')
+const WS_BASE = import.meta.env.VITE_WS_URL || 'ws://localhost:8000'
 
 export default function RoomConnection({
     roomName,
