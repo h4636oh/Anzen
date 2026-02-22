@@ -135,6 +135,11 @@ async def websocket_signaling(room_name: str, ws: WebSocket, db: AsyncSession = 
     if room_name not in rooms_registry:
         rooms_registry[room_name] = {}
 
+    if len(rooms_registry.get(room_name, {})) >= 200:
+        await ws.send_text(json.dumps({"type": "error", "message": "Room is full. Try again later."}))
+        await ws.close(code=1008)
+        return
+
     existing_peers = [
         {"peerId": pid, "username": data["username"], "avatarSeed": data["avatarSeed"]}
         for pid, data in rooms_registry[room_name].items()

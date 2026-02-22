@@ -5,11 +5,10 @@ import Sidebar from './components/Sidebar.jsx'
 import ChatWindow from './components/ChatWindow.jsx'
 import ConfirmModal from './components/ConfirmModal.jsx'
 import LockScreen from './components/LockScreen.jsx'
+import RoomConnection from './components/RoomConnection.jsx'
 import { generateUsername, generateAvatarSeed } from './utils/generators.js'
 import { getPrefs, savePrefs, getRooms, saveRoom, deleteRoom, getMessages, getMessagesPage, addMessage, wipeAllData, updateRoomActivity, clearUnread, initEncryption } from './hooks/useIndexedDB.js'
-import { useWebRTC } from './hooks/useWebRTC.js'
 
-const WS_BASE = import.meta.env.VITE_WS_URL || 'ws://localhost:8000'
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export default function App() {
@@ -34,17 +33,25 @@ export default function App() {
   const [rooms, setRooms] = useState([])
   const [activeRoom, setActiveRoom] = useState(null)
   const [roomToLeave, setRoomToLeave] = useState(null)
-  const [messages, setMessages] = useState([])  // messages for activeRoom
-  const [peers, setPeers] = useState([])         // [{ id, username, avatarSeed }]
-  const [connectionStatus, setConnectionStatus] = useState('idle')
-  const [wsError, setWsError] = useState(null)   // last error message from backend
-  const [allLoaded, setAllLoaded] = useState(false)     // true when no older pages remain
-  const [loadingMore, setLoadingMore] = useState(false)  // true while fetching an older page
-  const msgOffsetRef = useRef(0)                         // how many msgs from the end we've loaded
 
-  // ── Signaling WebSocket ───────────────────────────────────────────────────────
-  const wsRef = useRef(null)
-  const peerMetaRef = useRef(new Map()) // peerId → { username, avatarSeed }
+  // Room data mapped by roomName
+  const [messagesByRoom, setMessagesByRoom] = useState({})
+  const [peersByRoom, setPeersByRoom] = useState({})
+  const [statusByRoom, setStatusByRoom] = useState({})
+  const [errorByRoom, setErrorByRoom] = useState({})
+
+  // Pagination mapped by roomName
+  const [allLoadedByRoom, setAllLoadedByRoom] = useState({})
+  const [loadingMoreByRoom, setLoadingMoreByRoom] = useState({})
+  const msgOffsetRefs = useRef({})
+
+  const roomActionsRef = useRef({}) // roomName -> { broadcastText, broadcastFile, disconnectAll, getPeerIds }
+
+  // ── Connection Limits ─────────────────────────────────────────────────────────
+  const [limitModal, setLimitModal] = useState(null) // 'warning250' | 'prompt450' | null
+  const [pendingJoinRoom, setPendingJoinRoom] = useState(null)
+
+  const totalPeers = Object.values(peersByRoom).reduce((acc, peers) => acc + (peers?.length || 0), 0)
 
   // ── Load persisted identity on mount ─────────────────────────────────────────
   useEffect(() => {
@@ -143,9 +150,6 @@ export default function App() {
 
     // Check periodically
     const interval = setInterval(() => {
-      // Only lock if we have a valid password set and we're not already on the landing page
-      // Actually, locking on landing page is fine too if they entered the password but walked away,
-      // but usually they just close it. Let's lock if appPasswordHash is valid, not 'SKIP', and we aren't locked.
       if (!isLocked && appPasswordHash && appPasswordHash !== 'SKIP') {
         if (Date.now() - lastActivityAt.current > INACTIVITY_LIMIT_MS) {
           setIsLocked(true)
@@ -163,127 +167,69 @@ export default function App() {
     }
   }, [isLocked, appPasswordHash, INACTIVITY_LIMIT_MS])
 
-  // ── WebRTC callbacks ──────────────────────────────────────────────────────────
-  const handleIncomingMessage = useCallback(async (msg) => {
-    if (!activeRoom) return
-    setMessages(prev => [...prev, msg])
-    await addMessage(activeRoom, msg)
-    await notifyRoomActivity(activeRoom)
-  }, [activeRoom, notifyRoomActivity])
+  // ── RoomConnection Callbacks ─────────────────────────────────────────────────
+  const handleIncomingMessage = useCallback(async (roomName, msg) => {
+    setMessagesByRoom(prev => ({
+      ...prev,
+      [roomName]: [...(prev[roomName] || []), msg]
+    }))
+    await addMessage(roomName, msg)
+    await notifyRoomActivity(roomName)
+  }, [notifyRoomActivity])
 
-  const handlePeerJoined = useCallback((peerId) => {
-    const meta = peerMetaRef.current.get(peerId) || { username: 'Unknown', avatarSeed: peerId }
-    setPeers(prev => prev.find(p => p.id === peerId) ? prev : [...prev, { id: peerId, ...meta }])
+  const handlePeersUpdate = useCallback((roomName, updater) => {
+    setPeersByRoom(prev => ({ ...prev, [roomName]: updater(prev[roomName] || []) }))
   }, [])
 
-  const handlePeerLeft = useCallback((peerId) => {
-    setPeers(prev => prev.filter(p => p.id !== peerId))
+  const handleConnectionStatusChange = useCallback((roomName, status, error) => {
+    setStatusByRoom(prev => ({ ...prev, [roomName]: status }))
+    setErrorByRoom(prev => ({ ...prev, [roomName]: error }))
   }, [])
 
-  const { initiateCall, handleOffer, handleAnswer, handleIceCandidate, broadcastText, broadcastFile, disconnectAll } = useWebRTC({
-    signalingWsRef: wsRef,   // pass the ref, not wsRef.current — hooks always read .current at call time
-    localPeerId: user?.peerId,
-    localUser: user,
-    onMessage: handleIncomingMessage,
-    onPeerJoined: handlePeerJoined,
-    onPeerLeft: handlePeerLeft,
-  })
+  const registerRoomActions = useCallback((roomName, actions) => {
+    roomActionsRef.current[roomName] = actions
+  }, [])
 
-  // ── Open signaling WebSocket for a room ───────────────────────────────────────
-  function openSignalingWs(roomName, password) {
-    // Close existing WS
-    wsRef.current?.close()
-    setConnectionStatus('connecting')
-    setWsError(null)
-    setPeers([])
-    let hadError = false
+  const unregisterRoomActions = useCallback((roomName) => {
+    delete roomActionsRef.current[roomName]
+  }, [])
 
-    const ws = new WebSocket(`${WS_BASE}/ws/${roomName}`)
-    wsRef.current = ws
+  // ── Room initialization ───────────────────────────────────────────────────────
+  const PAGE_SIZE = 40
 
-    // Timeout: if WS doesn't open within 8s, close and show an error
-    const timeout = setTimeout(() => {
-      if (ws.readyState !== WebSocket.OPEN) {
-        ws.close()
-        setConnectionStatus('failed')
-        setWsError('Connection timed out — is the backend running at ' + WS_BASE + '?')
+  async function loadInitialMessages(roomName) {
+    if (!msgOffsetRefs.current[roomName]) msgOffsetRefs.current[roomName] = 0
+    msgOffsetRefs.current[roomName] = 0
+    setAllLoadedByRoom(prev => ({ ...prev, [roomName]: false }))
+    const { msgs, total } = await getMessagesPage(roomName, 0, PAGE_SIZE)
+    msgOffsetRefs.current[roomName] = msgs.length
+    setMessagesByRoom(prev => ({ ...prev, [roomName]: msgs }))
+    setAllLoadedByRoom(prev => ({ ...prev, [roomName]: msgs.length >= total }))
+  }
+
+  async function handleLoadMore(roomName) {
+    if (loadingMoreByRoom[roomName] || allLoadedByRoom[roomName] || !roomName) return
+    setLoadingMoreByRoom(prev => ({ ...prev, [roomName]: true }))
+    try {
+      const currentOffset = msgOffsetRefs.current[roomName] || 0
+      const { msgs, total } = await getMessagesPage(roomName, currentOffset, PAGE_SIZE)
+      if (msgs.length === 0) {
+        setAllLoadedByRoom(prev => ({ ...prev, [roomName]: true }))
+        return
       }
-    }, 8000)
-
-    ws.onopen = () => {
-      clearTimeout(timeout)
-      ws.send(JSON.stringify({
-        type: 'join',
-        password,
-        peerId: user.peerId,
-        username: user.username,
-        avatarSeed: user.avatarSeed,
+      msgOffsetRefs.current[roomName] = currentOffset + msgs.length
+      setMessagesByRoom(prev => ({
+        ...prev,
+        [roomName]: [...msgs, ...(prev[roomName] || [])]
       }))
-    }
-
-    ws.onmessage = async (evt) => {
-      let msg
-      try { msg = JSON.parse(evt.data) } catch { return }
-
-      switch (msg.type) {
-        case 'joined': {
-          setConnectionStatus('connected')
-          // Initiate calls to all existing peers in the room
-          for (const peer of (msg.peers || [])) {
-            peerMetaRef.current.set(peer.peerId, { username: peer.username, avatarSeed: peer.avatarSeed })
-            await initiateCall(peer.peerId)
-          }
-          break
-        }
-        case 'peer-joined': {
-          peerMetaRef.current.set(msg.peerId, { username: msg.username, avatarSeed: msg.avatarSeed })
-          break
-        }
-        case 'offer': {
-          peerMetaRef.current.set(msg.from, { username: msg.username || 'Peer', avatarSeed: msg.avatarSeed || msg.from })
-          await handleOffer(msg.from, msg.sdp)
-          break
-        }
-        case 'answer': {
-          await handleAnswer(msg.from, msg.sdp)
-          break
-        }
-        case 'ice-candidate': {
-          await handleIceCandidate(msg.from, msg.candidate)
-          break
-        }
-        case 'peer-left': {
-          handlePeerLeft(msg.peerId)
-          break
-        }
-        case 'error': {
-          hadError = true
-          setConnectionStatus('failed')
-          setWsError(msg.message || 'Server error')
-          console.error('[Signaling error]', msg.message)
-          break
-        }
-        default:
-          break
-      }
-    }
-
-    ws.onclose = () => {
-      clearTimeout(timeout)
-      // Only revert to idle if there was no error — preserve the error state if it failed
-      if (!hadError) setConnectionStatus(prev => prev === 'connecting' ? 'failed' : 'idle')
-    }
-
-    ws.onerror = () => {
-      clearTimeout(timeout)
-      setConnectionStatus('failed')
-      setWsError('Could not reach the signaling server')
+      setAllLoadedByRoom(prev => ({ ...prev, [roomName]: msgOffsetRefs.current[roomName] >= total }))
+    } finally {
+      setLoadingMoreByRoom(prev => ({ ...prev, [roomName]: false }))
     }
   }
 
   // ── Room actions ──────────────────────────────────────────────────────────────
-  async function handleJoinRoom(roomName, password, isCreating) {
-    // Create room on backend first if creating
+  async function performJoinRoom(roomName, password, isCreating) {
     if (isCreating) {
       try {
         const res = await fetch(`${API_BASE}/rooms`, {
@@ -294,16 +240,13 @@ export default function App() {
         if (!res.ok) {
           let detail = 'Failed to create room on server'
           try { detail = (await res.json()).detail || detail } catch { /* ignore */ }
-          // Surface error in the chat area so user can see it
           setActiveRoom(roomName)
-          setConnectionStatus('failed')
-          setWsError(`Server error (${res.status}): ${detail}`)
-          return  // abort — do NOT save to IndexedDB since room wasn't created
+          handleConnectionStatusChange(roomName, 'failed', `Server error (${res.status}): ${detail}`)
+          return
         }
       } catch (e) {
         setActiveRoom(roomName)
-        setConnectionStatus('failed')
-        setWsError('Cannot reach the backend at ' + API_BASE + '. Is it running?')
+        handleConnectionStatusChange(roomName, 'failed', 'Cannot reach the backend at ' + API_BASE + '. Is it running?')
         return
       }
     }
@@ -313,8 +256,39 @@ export default function App() {
     setRooms(updatedRooms)
     setActiveRoom(roomName)
 
-    await loadInitialMessages(roomName)
-    openSignalingWs(roomName, password)
+    // the RoomConnection component will mount automatically since this room is now in `rooms`
+    if (!messagesByRoom[roomName]) {
+      await loadInitialMessages(roomName)
+    }
+  }
+
+  async function handleJoinRoom(roomName, password, isCreating) {
+    const isNewRoom = !rooms.find(r => r.roomName === roomName)
+    if (isNewRoom) {
+      if (totalPeers >= 450) {
+        setLimitModal('prompt450')
+        return
+      }
+      if (totalPeers >= 250) {
+        setPendingJoinRoom({ roomName, password, isCreating })
+        setLimitModal('warning250')
+        return
+      }
+    }
+    await performJoinRoom(roomName, password, isCreating)
+  }
+
+  function confirmPendingJoin() {
+    if (pendingJoinRoom) {
+      performJoinRoom(pendingJoinRoom.roomName, pendingJoinRoom.password, pendingJoinRoom.isCreating)
+      setPendingJoinRoom(null)
+    }
+    setLimitModal(null)
+  }
+
+  function openNewTabAndCancel() {
+    window.open(window.location.href, '_blank')
+    setLimitModal(null)
   }
 
   async function handleSelectRoom(roomName) {
@@ -325,36 +299,8 @@ export default function App() {
     await clearUnread(roomName)
     setRooms(prev => prev.map(r => r.roomName === roomName ? { ...r, hasUnread: false } : r))
 
-    await loadInitialMessages(roomName)
-    openSignalingWs(roomName, room.password)
-  }
-
-  const PAGE_SIZE = 40
-
-  async function loadInitialMessages(roomName) {
-    msgOffsetRef.current = 0
-    setAllLoaded(false)
-    const { msgs, total } = await getMessagesPage(roomName, 0, PAGE_SIZE)
-    msgOffsetRef.current = msgs.length
-    setMessages(msgs)
-    setAllLoaded(msgs.length >= total)
-  }
-
-  async function handleLoadMore(roomName) {
-    if (loadingMore || allLoaded || !roomName) return
-    setLoadingMore(true)
-    try {
-      const currentOffset = msgOffsetRef.current
-      const { msgs, total } = await getMessagesPage(roomName, currentOffset, PAGE_SIZE)
-      if (msgs.length === 0) {
-        setAllLoaded(true)
-        return
-      }
-      msgOffsetRef.current = currentOffset + msgs.length
-      setMessages(prev => [...msgs, ...prev])
-      setAllLoaded(msgOffsetRef.current >= total)
-    } finally {
-      setLoadingMore(false)
+    if (!messagesByRoom[roomName]) {
+      await loadInitialMessages(roomName)
     }
   }
 
@@ -367,18 +313,19 @@ export default function App() {
     const roomName = roomToLeave
     setRoomToLeave(null)
 
-    disconnectAll()
-    wsRef.current?.close()
+    // Unmounting the RoomConnection handles WebRTC & DC closures.
     await deleteRoom(roomName)
     const updatedRooms = await getRooms()
     setRooms(updatedRooms)
     if (activeRoom === roomName) {
       setActiveRoom(null)
-      setMessages([])
-      setConnectionStatus('idle')
-      setAllLoaded(false)
-      msgOffsetRef.current = 0
     }
+
+    setMessagesByRoom(prev => { const n = { ...prev }; delete n[roomName]; return n })
+    setPeersByRoom(prev => { const n = { ...prev }; delete n[roomName]; return n })
+    setStatusByRoom(prev => { const n = { ...prev }; delete n[roomName]; return n })
+    setErrorByRoom(prev => { const n = { ...prev }; delete n[roomName]; return n })
+    delete msgOffsetRefs.current[roomName]
   }
 
   // ── Send handlers ─────────────────────────────────────────────────────────────
@@ -393,17 +340,18 @@ export default function App() {
       timestamp: Date.now(),
       text,
     }
-    broadcastText(text)
-    setMessages(prev => [...prev, msg])
+
+    roomActionsRef.current[activeRoom]?.broadcastText(text)
+
+    setMessagesByRoom(prev => ({ ...prev, [activeRoom]: [...(prev[activeRoom] || []), msg] }))
     await addMessage(activeRoom, msg)
     await notifyRoomActivity(activeRoom)
   }
 
   async function handleSendFile(file) {
     if (!user || !activeRoom) return
-    broadcastFile(file)
+    roomActionsRef.current[activeRoom]?.broadcastFile(file)
 
-    // Create a local display message for the sender (mirrors what the receiver gets)
     const blob = file
     const objectUrl = URL.createObjectURL(file)
     const msg = {
@@ -418,7 +366,7 @@ export default function App() {
       objectUrl,
       blob,
     }
-    setMessages(prev => [...prev, msg])
+    setMessagesByRoom(prev => ({ ...prev, [activeRoom]: [...(prev[activeRoom] || []), msg] }))
     await addMessage(activeRoom, msg)
     await notifyRoomActivity(activeRoom)
   }
@@ -426,15 +374,20 @@ export default function App() {
 
   // ── Wipe ──────────────────────────────────────────────────────────────────────
   async function handleClearChat() {
-    disconnectAll()
-    wsRef.current?.close()
+    for (const actions of Object.values(roomActionsRef.current)) {
+      actions.disconnectAll?.()
+    }
     await wipeAllData()
     setUser(null)
     setAppPasswordHash(null)
     setRooms([])
     setActiveRoom(null)
-    setMessages([])
-    setConnectionStatus('idle')
+    setMessagesByRoom({})
+    setPeersByRoom({})
+    setStatusByRoom({})
+    setErrorByRoom({})
+    setAllLoadedByRoom({})
+    msgOffsetRefs.current = {}
     await loadIdentity()
   }
 
@@ -448,6 +401,9 @@ export default function App() {
             const savedRooms = await getRooms()
             setRooms(savedRooms)
             lastActivityAt.current = Date.now()
+            for (const r of savedRooms) {
+              await loadInitialMessages(r.roomName)
+            }
             setView('chat')
           }}
           onClearChat={handleClearChat}
@@ -482,6 +438,22 @@ export default function App() {
           }}
         />
       )}
+
+      {/* Render headless RoomConnections for all saved rooms */}
+      {rooms.map(r => (
+        <RoomConnection
+          key={r.roomName}
+          roomName={r.roomName}
+          password={r.password}
+          user={user}
+          onMessage={handleIncomingMessage}
+          onPeersUpdate={handlePeersUpdate}
+          onConnectionStatusChange={handleConnectionStatusChange}
+          registerActions={registerRoomActions}
+          unregisterActions={unregisterRoomActions}
+        />
+      ))}
+
       <Sidebar
         user={user}
         rooms={rooms}
@@ -500,17 +472,17 @@ export default function App() {
       {activeRoom ? (
         <ChatWindow
           room={activeRoomData}
-          messages={messages}
-          peers={peers}
+          messages={messagesByRoom[activeRoom] || []}
+          peers={peersByRoom[activeRoom] || []}
           localUser={user}
-          connectionStatus={connectionStatus}
-          wsError={wsError}
+          connectionStatus={statusByRoom[activeRoom] || 'idle'}
+          wsError={errorByRoom[activeRoom]}
           onSendText={handleSendText}
           onSendFile={handleSendFile}
           onOpenSidebar={() => setSidebarOpen(true)}
           onLoadMore={() => handleLoadMore(activeRoom)}
-          allLoaded={allLoaded}
-          loadingMore={loadingMore}
+          allLoaded={!!allLoadedByRoom[activeRoom]}
+          loadingMore={!!loadingMoreByRoom[activeRoom]}
         />
       ) : (
         <div className="relative flex-1 flex items-center justify-center flex-col gap-3 px-6"
@@ -538,6 +510,33 @@ export default function App() {
           onConfirm={confirmLeaveRoom}
           onCancel={() => setRoomToLeave(null)}
           isDestructive={true}
+        />
+      )}
+
+      {/* 250 Connections Warning Modal */}
+      {limitModal === 'warning250' && (
+        <ConfirmModal
+          title="High Connection Count"
+          message="You are approaching 250 active connections. Joining more rooms may degrade your PC's performance. Continue?"
+          confirmText="Continue"
+          onConfirm={confirmPendingJoin}
+          onCancel={() => {
+            setLimitModal(null)
+            setPendingJoinRoom(null)
+          }}
+          isDestructive={false}
+        />
+      )}
+
+      {/* 450 Connections Limit Prompt Modal */}
+      {limitModal === 'prompt450' && (
+        <ConfirmModal
+          title="Maximum Connections Reached"
+          message="You've reached 450 active connections. Due to browser limitations, you must open Anzen in a new tab to connect with more people. Open new tab?"
+          confirmText="Open New Tab"
+          onConfirm={openNewTabAndCancel}
+          onCancel={() => setLimitModal(null)}
+          isDestructive={false}
         />
       )}
     </div>
