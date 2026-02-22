@@ -13,11 +13,20 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./anzen.db")
 _connect_args = {}
 if "sqlite" in DATABASE_URL and "aiosqlite" not in DATABASE_URL:
     _connect_args = {"check_same_thread": False}
+elif "postgres" in DATABASE_URL:
+    # Required for Supabase transaction pooler (port 6543) with asyncpg
+    # SSL is also explicitly required to prevent connection hangs
+    _connect_args = {
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
+        "ssl": True,
+    }
 
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,
     connect_args=_connect_args,
+    pool_pre_ping=True,  # Recommended for connection pools
 )
 
 AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
