@@ -1,6 +1,9 @@
 __pycache__/
-venv/
+# Environments
 .env
-.env.example
-backend/.env
-backend/anzen.db
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/ckend/anzen.db

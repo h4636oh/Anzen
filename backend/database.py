@@ -17,12 +17,7 @@ if DATABASE_URL.startswith("postgresql+asyncpg://"):
 _connect_args = {}
 if "sqlite" in DATABASE_URL and "aiosqlite" not in DATABASE_URL:
     _connect_args = {"check_same_thread": False}
-elif "postgres" in DATABASE_URL:
-    # psycopg uses different connect args than asyncpg
-    # However, psycopg automatically handles prepared statements safely with pgbouncer/supavisor
-    _connect_args = {
-        "sslmode": "require",
-    }
+
 
 engine = create_async_engine(
     DATABASE_URL,
