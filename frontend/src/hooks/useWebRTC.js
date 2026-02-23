@@ -7,28 +7,29 @@
 import { useRef, useCallback } from 'react'
 import { sendFile, reassembleFile, isMedia } from '../utils/fileTransfer.js'
 
-const ICE_SERVERS = {
-    iceServers: [
+const getIceServers = () => {
+    const servers = [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        // Free TURN server provided by Metered (OpenRelay)
-        {
-            urls: 'turn:openrelay.metered.ca:80',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-        },
-        {
-            urls: 'turn:openrelay.metered.ca:443',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-        },
-        {
-            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-        }
-    ],
+    ];
+
+    if (import.meta.env.VITE_TURN_USERNAME && import.meta.env.VITE_TURN_CREDENTIAL) {
+        const username = import.meta.env.VITE_TURN_USERNAME;
+        const credential = import.meta.env.VITE_TURN_CREDENTIAL;
+
+        servers.push(
+            { urls: "stun:stun.relay.metered.ca:80" },
+            { urls: "turn:global.relay.metered.ca:80", username, credential },
+            { urls: "turn:global.relay.metered.ca:80?transport=tcp", username, credential },
+            { urls: "turn:global.relay.metered.ca:443", username, credential },
+            { urls: "turns:global.relay.metered.ca:443?transport=tcp", username, credential }
+        );
+    }
+
+    return { iceServers: servers };
 }
+
+const ICE_SERVERS = getIceServers();
 
 export function useWebRTC({ signalingWsRef, localPeerId, localUser, onMessage, onPeerJoined, onPeerLeft }) {
     const peerConnections = useRef(new Map()) // peerId → RTCPeerConnection
